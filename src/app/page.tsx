@@ -5,7 +5,6 @@ import { useState, useEffect } from "react";
 import type { RefactorPlan, RefactorResponse, CleanupRequest, RefactorRequest, SchemaResponse, RenameOperation } from "@/lib/types";
 import { runRefactor, runCleanup, analyzeSchema, generatePlan, runCodeFix } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { generateRenamePlan } from "@/ai/flows/generate-rename-plan";
 
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger } from "@/components/ui/sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -128,9 +127,8 @@ export default function RefactorPage() {
   const [options, setOptions] = useState({ useSynonyms: true, useViews: true, cqrs: true });
   const [rootKey, setRootKey] = useState("SOLUTION");
   const [activePlanTab, setActivePlanTab] = useState<"table" | "column">("table");
-  const [aiPlanDescription, setAiPlanDescription] = useState("");
   
-  const [loading, setLoading] = useState<"preview" | "apply" | "cleanup" | "analyze" | "plan" | "codefix" | "aiplan" | false>(false);
+  const [loading, setLoading] = useState<"preview" | "apply" | "cleanup" | "analyze" | "plan" | "codefix" | false>(false);
   const [result, setResult] = useState<RefactorResponse | null>(null);
   const [schema, setSchema] = useState<SchemaResponse | null>(null);
   const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
@@ -144,11 +142,11 @@ export default function RefactorPage() {
 
   const handleApiCall = async <T,>(
     apiFn: () => Promise<T>,
-    loadingState: "preview" | "apply" | "cleanup" | "analyze" | "plan" | "codefix" | "aiplan",
+    loadingState: "preview" | "apply" | "cleanup" | "analyze" | "plan" | "codefix",
     onSuccess: (data: T) => void,
     toastMessages: { loading: string; success: string; error: string }
   ) => {
-    if (!connectionString.trim() && !['codefix', 'aiplan'].includes(loadingState)) {
+    if (!connectionString.trim() && !['codefix'].includes(loadingState)) {
       toast({ variant: "destructive", title: "Connection string is required." });
       return;
     }
@@ -217,21 +215,6 @@ export default function RefactorPage() {
       success: apply ? "Code fixes applied." : "Code fix preview generated.",
       error: "Failed to run CodeFix."
     }
-  );
-
-  const handleAiGeneratePlan = () => handleApiCall(
-    async () => {
-        const result = await generateRenamePlan({ description: aiPlanDescription });
-        try {
-            const parsedPlan = JSON.parse(result.plan);
-            return parsedPlan;
-        } catch (e) {
-            throw new Error("AI returned an invalid plan format.");
-        }
-    },
-    "aiplan",
-    (data) => setPlan(data),
-    { loading: "AI is generating a plan...", success: "AI plan generated successfully.", error: "Failed to generate plan with AI." }
   );
 
   const addRename = () => {
@@ -375,26 +358,6 @@ export default function RefactorPage() {
                       )}
                     </CardContent>
                 </Card>
-                
-                 <Card>
-                     <CardHeader>
-                      <CardTitle className="text-base font-medium">AI Plan Generation</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <Textarea
-                          placeholder="e.g., rename all tables with 'Player' to 'User' and change 'money' columns to 'balance'"
-                          rows={4}
-                          value={aiPlanDescription}
-                          onChange={(e) => setAiPlanDescription(e.target.value)}
-                          className="font-sans text-sm"
-                        />
-                        <Button onClick={handleAiGeneratePlan} disabled={loading === 'aiplan' || !aiPlanDescription} className="w-full">
-                           {loading === 'aiplan' ? <Loader2 className="animate-spin" /> : <BrainCircuit />}
-                           Generate with AI
-                        </Button>
-                    </CardContent>
-                 </Card>
-
 
                 <Card>
                     <CardHeader>
@@ -469,5 +432,3 @@ export default function RefactorPage() {
     </div>
   );
 }
-
-    
