@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import type { RefactorPlan, RefactorResponse, CleanupRequest, RefactorRequest, SchemaResponse, RenameOperation } from "@/lib/types";
 import { runRefactor, runCleanup, analyzeSchema, generatePlan, runCodeFix } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { generateRenamePlan } from "@/ai/flows/generate-rename-plan";
 
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger } from "@/components/ui/sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -35,7 +36,9 @@ import {
   Database,
   Info,
   PlusCircle,
-  XCircle
+  XCircle,
+  Eye,
+  FileCode
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import ResultsPanel from "@/components/refactor/ResultsPanel";
@@ -74,7 +77,6 @@ function SchemaViewer({ schema, onRefresh, loading }: { schema: SchemaResponse |
                         <AccordionItem value={table.name} key={table.name}>
                             <AccordionTrigger className="text-sm font-normal">
                                 <div className="flex items-center gap-2">
-                                    <ChevronRight className="h-4 w-4" />
                                     <Database className="h-4 w-4" />
                                     {table.name}
                                 </div>
@@ -126,8 +128,9 @@ export default function RefactorPage() {
   const [options, setOptions] = useState({ useSynonyms: true, useViews: true, cqrs: true });
   const [rootKey, setRootKey] = useState("SOLUTION");
   const [activePlanTab, setActivePlanTab] = useState<"table" | "column">("table");
+  const [aiPlanDescription, setAiPlanDescription] = useState("");
   
-  const [loading, setLoading] = useState<"preview" | "apply" | "cleanup" | "analyze" | "plan" | "codefix" | false>(false);
+  const [loading, setLoading] = useState<"preview" | "apply" | "cleanup" | "analyze" | "plan" | "codefix" | "aiplan" | false>(false);
   const [result, setResult] = useState<RefactorResponse | null>(null);
   const [schema, setSchema] = useState<SchemaResponse | null>(null);
   const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
@@ -141,15 +144,15 @@ export default function RefactorPage() {
 
   const handleApiCall = async <T,>(
     apiFn: () => Promise<T>,
-    loadingState: "preview" | "apply" | "cleanup" | "analyze" | "plan" | "codefix",
+    loadingState: "preview" | "apply" | "cleanup" | "analyze" | "plan" | "codefix" | "aiplan",
     onSuccess: (data: T) => void,
     toastMessages: { loading: string; success: string; error: string }
   ) => {
-    if (!connectionString.trim() && loadingState !== 'codefix') {
+    if (!connectionString.trim() && !['codefix', 'aiplan'].includes(loadingState)) {
       toast({ variant: "destructive", title: "Connection string is required." });
       return;
     }
-     if (plan.renames.length === 0 && (loadingState === 'preview' || loadingState === 'apply' || loadingState === 'cleanup')) {
+     if (plan.renames.length === 0 && ['preview', 'apply', 'cleanup', 'plan'].includes(loadingState)) {
       toast({ variant: "destructive", title: "Refactor plan cannot be empty." });
       return;
     }
@@ -183,7 +186,7 @@ export default function RefactorPage() {
   const handlePlan = () => handleApiCall(
     () => generatePlan({ connectionString, renames: plan.renames, ...options }),
     "plan",
-    (data) => setResult(data as any),
+    (data) => setResult(prev => ({ ...prev, sql: data.sql, ok: true })),
     { loading: "Generating plan...", success: "Plan generated.", error: "Failed to generate plan." }
   );
 
@@ -208,12 +211,27 @@ export default function RefactorPage() {
   const handleCodefix = (apply: boolean) => handleApiCall(
     () => runCodeFix({ rootKey, plan, apply }),
     "codefix",
-    (data) => setResult({ ...result, codefix: data, ok: data.ok } as RefactorResponse),
+    (data) => setResult(prev => ({ ...prev, codefix: data, ok: data.ok })),
     { 
       loading: apply ? "Applying code fixes..." : "Previewing code fixes...",
       success: apply ? "Code fixes applied." : "Code fix preview generated.",
       error: "Failed to run CodeFix."
     }
+  );
+
+  const handleAiGeneratePlan = () => handleApiCall(
+    async () => {
+        const result = await generateRenamePlan({ description: aiPlanDescription });
+        try {
+            const parsedPlan = JSON.parse(result.plan);
+            return parsedPlan;
+        } catch (e) {
+            throw new Error("AI returned an invalid plan format.");
+        }
+    },
+    "aiplan",
+    (data) => setPlan(data),
+    { loading: "AI is generating a plan...", success: "AI plan generated successfully.", error: "Failed to generate plan with AI." }
   );
 
   const addRename = () => {
@@ -232,10 +250,6 @@ export default function RefactorPage() {
   const removeRename = (index: number) => {
     setPlan(prev => ({ ...prev, renames: prev.renames.filter((_, i) => i !== index) }));
   };
-
-  const handleAiGeneratePlan = () => {
-     toast({ title: "AI Plan Generation", description: "This feature is not yet implemented." });
-  }
 
   return (
     <div className="flex min-h-screen bg-background text-foreground font-sans">
@@ -257,25 +271,13 @@ export default function RefactorPage() {
                           Historial
                       </SidebarMenuButton>
                   </SidebarMenuItem>
-                  <SidebarMenuItem>
-                      <SidebarMenuButton>
-                          <LayoutGrid />
-                          Esquema
-                      </SidebarMenuButton>
-                  </SidebarMenuItem>
-                   <SidebarMenuItem>
-                      <SidebarMenuButton>
-                          <Settings />
-                          Ajustes
-                      </SidebarMenuButton>
-                  </SidebarMenuItem>
               </SidebarMenu>
           </SidebarContent>
           <SidebarFooter>
              <div className="p-2 border-t border-border">
                  <Button variant={connectionOk ? "secondary" : "outline"} className="w-full mt-2 justify-start gap-2" onClick={handleAnalyze}>
                       {loading === 'analyze' ? <Loader2 className="animate-spin" /> : <Power />}
-                      <span>{connectionOk === null ? "Conexión" : connectionOk ? "Conexión Exitosa" : "Error Conexión"}</span>
+                      <span>{connectionOk === null ? "Check Connection" : connectionOk ? "Connection OK" : "Connection Failed"}</span>
                  </Button>
               </div>
           </SidebarFooter>
@@ -302,7 +304,6 @@ export default function RefactorPage() {
         <main className="flex-grow p-4 sm:p-6 lg:p-8">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
               
-              {/* Left Column */}
               <div className="col-span-1 flex flex-col gap-6">
                 <Card>
                     <CardHeader>
@@ -320,12 +321,10 @@ export default function RefactorPage() {
                               className="font-mono text-sm mt-1 bg-background"
                             />
                         </div>
-                         {/* Plan tabs */}
                         <div className="flex space-x-1 rounded-md bg-muted p-1">
                             <Button onClick={() => setActivePlanTab('table')} variant={activePlanTab === 'table' ? 'ghost' : 'ghost'} className={`w-full h-8 text-xs ${activePlanTab === 'table' ? 'bg-background shadow-sm' : ''}`}>Renombrar tabla</Button>
                             <Button onClick={() => setActivePlanTab('column')} variant={activePlanTab === 'column' ? 'ghost' : 'ghost'} className={`w-full h-8 text-xs ${activePlanTab === 'column' ? 'bg-background shadow-sm' : ''}`}>Renombrar columna</Button>
                         </div>
-                        {/* Formulario para añadir renames */}
                         <div className="space-y-3 pt-2">
                           <Input
                             placeholder="Tabla Origen"
@@ -377,6 +376,26 @@ export default function RefactorPage() {
                     </CardContent>
                 </Card>
                 
+                 <Card>
+                     <CardHeader>
+                      <CardTitle className="text-base font-medium">AI Plan Generation</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <Textarea
+                          placeholder="e.g., rename all tables with 'Player' to 'User' and change 'money' columns to 'balance'"
+                          rows={4}
+                          value={aiPlanDescription}
+                          onChange={(e) => setAiPlanDescription(e.target.value)}
+                          className="font-sans text-sm"
+                        />
+                        <Button onClick={handleAiGeneratePlan} disabled={loading === 'aiplan' || !aiPlanDescription} className="w-full">
+                           {loading === 'aiplan' ? <Loader2 className="animate-spin" /> : <BrainCircuit />}
+                           Generate with AI
+                        </Button>
+                    </CardContent>
+                 </Card>
+
+
                 <Card>
                     <CardHeader>
                       <CardTitle className="text-base font-medium">Opciones</CardTitle>
@@ -398,84 +417,51 @@ export default function RefactorPage() {
                         </div>
                         <div className="flex items-center justify-between">
                              <Label htmlFor="cqrs" className="text-sm font-light flex items-center gap-2">
-                                CORS
-                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                            </Label>
+                                CQRS
+                             </Label>
                              <Switch id="cqrs" checked={options.cqrs} onCheckedChange={(checked) => setOptions(prev => ({...prev, cqrs: checked}))} />
                         </div>
-                         <p className="text-xs text-muted-foreground pt-2">
-                            Las visiaa son sofo lectura Cleam u tas elthrina cuando migres et zedigo.
-                         </p>
-                         {connectionOk && (
-                            <div className="flex items-center gap-2 text-sm text-green-400 bg-green-500/10 border border-green-500/20 rounded-md p-3">
-                                <CheckCircle className="h-4 w-4"/>
-                                Conexion Exitosa
-                            </div>
-                         )}
-                         <Button className="w-full" onClick={() => handleRefactor(false)} disabled={loading === 'preview'}>
-                            {loading === 'preview' ? <Loader2 className="animate-spin" /> : null}
-                            Preview
-                         </Button>
                     </CardContent>
                 </Card>
 
               </div>
 
-              {/* Middle Column */}
               <div className="col-span-1 flex flex-col gap-6">
                 <Card>
                     <CardHeader>
                       <CardTitle className="text-base font-medium">Acciones</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      {result?.codefix ? (
-                        <>
-                          <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground">Files scanned</span>
-                            <span>{result.codefix.scanned}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground">Changed</span>
-                            <span>{result.codefix.changed}</span>
-                          </div>
-                        </>
-                      ) : (
-                         <div className="text-center text-muted-foreground text-xs py-4">No hay acciones para mostrar.</div>
-                      )}
+                    <CardContent className="space-y-3">
+                      <Button variant="outline" className="w-full justify-start" onClick={() => handleRefactor(false)} disabled={loading === 'preview'}>
+                          {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
+                          Preview DB + Code
+                      </Button>
+                       <Button variant="outline" className="w-full justify-start" onClick={() => handleCodefix(false)} disabled={loading === 'codefix'}>
+                          {loading === 'codefix' ? <Loader2 className="animate-spin" /> : <FileCode/>}
+                          Preview Code-only
+                      </Button>
+                       <Button variant="outline" className="w-full justify-start" onClick={handlePlan} disabled={loading === 'plan'}>
+                          {loading === 'plan' ? <Loader2 className="animate-spin" /> : <FileText/>}
+                          Generate SQL Plan
+                      </Button>
                       
-                      <div className="border-t border-border pt-4 space-y-2">
-                         <Button variant="ghost" className="w-full justify-between text-muted-foreground font-normal">
-                            <span>Analyzar</span>
-                            <ChevronRight className="h-4 w-4" />
-                         </Button>
-                         <Button variant="ghost" className="w-full justify-between text-muted-foreground font-normal">
-                            <span>Previosio</span>
-                            <span className="text-foreground">Gengaurza</span>
-                         </Button>
-                      </div>
-
-                      <div className="pt-4 space-y-3">
-                        <Button variant="destructive" className="w-full bg-orange-600 hover:bg-orange-700 text-white" onClick={() => handleRefactor(true)} disabled={loading === 'apply' || !result || result.apply === true}>
+                      <div className="border-t border-border pt-4 space-y-3">
+                        <Button variant="destructive" className="w-full" onClick={() => handleRefactor(true)} disabled={loading === 'apply' || !result || result.apply === true}>
                             {loading === 'apply' ? <Loader2 className="animate-spin" /> : null}
-                            Aplicar
+                            Aplicar Cambios
                         </Button>
                         <Button variant="secondary" className="w-full" onClick={handleCleanup} disabled={loading === 'cleanup'}>
                            {loading === 'cleanup' ? <Loader2 className="animate-spin" /> : null}
-                           Cleanup
-                        </Button>
-                         <Button variant="outline" className="w-full" onClick={handleAnalyze} disabled={loading === 'analyze'}>
-                           {loading === 'analyze' ? <Loader2 className="animate-spin" /> : null}
-                           Analyze
+                           Cleanup Compat Objects
                         </Button>
                       </div>
                     </CardContent>
                 </Card>
+                <SchemaViewer schema={schema} onRefresh={handleAnalyze} loading={loading === 'analyze'} />
               </div>
 
-              {/* Right Column */}
-              <div className="col-span-1 flex flex-col gap-6">
+              <div className="col-span-1">
                  <ResultsPanel result={result} loading={!!loading} error={result?.error || null} />
-                 <SchemaViewer schema={schema} onRefresh={handleAnalyze} loading={loading === 'analyze'} />
               </div>
             </div>
         </main>
@@ -483,7 +469,5 @@ export default function RefactorPage() {
     </div>
   );
 }
-
-    
 
     
