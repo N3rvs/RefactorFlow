@@ -5,10 +5,28 @@ export interface RenameOperation {
   columnFrom?: string;
   columnTo?: string;
   type?: string;
+  area?: "db" | "code" | "both";
 }
 
 export interface RefactorPlan {
   renames: RenameOperation[];
+}
+
+export interface PlanRequest {
+  connectionString: string;
+  renames: RenameOperation[];
+  useSynonyms: boolean;
+  useViews: boolean;
+  cqrs: boolean;
+}
+
+export interface PlanResponse {
+  sql: SqlScripts;
+  report: {
+    tablesChanged: number;
+    columnsChanged: number;
+    operations: number;
+  };
 }
 
 export interface RefactorRequest {
@@ -29,6 +47,14 @@ export interface CleanupRequest {
   cqrs: boolean;
 }
 
+export interface CodeFixRequest {
+    rootKey: string;
+    apply: boolean;
+    plan: RefactorPlan;
+    includeGlobs?: string[];
+    excludeGlobs?: string[];
+}
+
 export interface SqlScripts {
   renameSql?: string;
   compatSql?: string;
@@ -38,9 +64,11 @@ export interface SqlScripts {
 export interface CodefixFile {
   path: string;
   changed: boolean;
+  changes?: number; // From API docs
 }
 
 export interface CodefixResult {
+  ok: boolean;
   scanned: number;
   changed: number;
   files: CodefixFile[];

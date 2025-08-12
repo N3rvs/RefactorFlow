@@ -5,6 +5,10 @@ import type {
   RefactorResponse,
   CleanupRequest,
   SchemaResponse,
+  PlanRequest,
+  PlanResponse,
+  CodeFixRequest,
+  CodefixResult,
 } from "./types";
 
 async function getApiUrl() {
@@ -33,18 +37,35 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
       let errorData;
       try {
         errorData = await response.json();
+        // The backend seems to use 'error' or 'title' for error messages.
+        const message = errorData.error || errorData.title || `Request failed with status ${response.status}`;
+        const details = errorData.stack || errorData.detail || JSON.stringify(errorData, null, 2);
+        throw new Error(`${message}\n\n${details}`);
+
       } catch (e) {
-        // Not a JSON response
-        errorData = { error: `HTTP error! status: ${response.status}`, details: await response.text() };
+        // Not a JSON response or other parsing error
+        const textResponse = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}\n\n${textResponse}`);
       }
-      throw new Error(errorData.error || `Request failed with status ${response.status}`);
     }
     
     return await response.json();
   } catch (error: any) {
     console.error(`API call to ${url} failed:`, error);
-    throw new Error(error.message || "An unknown network error occurred.");
+    throw new Error(error.message || "An unknown network error occurred. Check API URL, CORS, and if the backend is running.");
   }
+}
+
+export async function analyzeSchema(connectionString: string): Promise<SchemaResponse> {
+  const encodedConnectionString = encodeURIComponent(connectionString);
+  return fetchApi<SchemaResponse>(`/analyze/schema?connectionString=${encodedConnectionString}`);
+}
+
+export async function generatePlan(data: PlanRequest): Promise<PlanResponse> {
+    return fetchApi<PlanResponse>("/plan", {
+        method: "POST",
+        body: JSON.stringify(data)
+    });
 }
 
 export async function runRefactor(data: Omit<RefactorRequest, 'apply'>, apply: boolean): Promise<RefactorResponse> {
@@ -62,7 +83,9 @@ export async function runCleanup(data: CleanupRequest): Promise<RefactorResponse
   });
 }
 
-export async function analyzeSchema(connectionString: string): Promise<SchemaResponse> {
-  const encodedConnectionString = encodeURIComponent(connectionString);
-  return fetchApi<SchemaResponse>(`/analyze/schema?connectionString=${encodedConnectionString}`);
+export async function runCodeFix(data: CodeFixRequest): Promise<CodefixResult> {
+    return fetchApi<CodefixResult>("/codefix/run", {
+        method: "POST",
+        body: JSON.stringify(data),
+    });
 }
