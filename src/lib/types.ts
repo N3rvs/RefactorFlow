@@ -8,6 +8,8 @@ export interface RenameOperation {
   area?: "db" | "code" | "both";
 }
 
+export type ApplyRequest = PlanRequest;
+
 export interface RefactorPlan {
   renames: RenameOperation[];
 }

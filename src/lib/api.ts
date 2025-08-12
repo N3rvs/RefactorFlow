@@ -1,5 +1,3 @@
-"use server";
-
 import type {
   RefactorRequest,
   RefactorResponse,
@@ -9,95 +7,120 @@ import type {
   PlanResponse,
   CodeFixRequest,
   CodefixResult,
+  ApplyRequest 
 } from "./types";
 
-async function getApiUrl() {
-  const apiUrl = process.env.NEXT_PUBLIC_DBREFACTOR_API;
-  if (!apiUrl) {
-    throw new Error("NEXT_PUBLIC_DBREFACTOR_API environment variable is not set.");
-  }
-  return apiUrl;
+function getApiBase() {
+  const raw =
+    process.env.NEXT_PUBLIC_DBREFACTOR_API ??
+    process.env.DBREFACTOR_API; 
+  if (!raw) throw new Error("Falta la variable de entorno NEXT_PUBLIC_DBREFACTOR_API/DBREFACTOR_API.");
+ 
+  return raw.replace(/\/+$/, "");
 }
 
-async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const apiUrl = await getApiUrl();
-  const url = `${apiUrl}${endpoint}`;
+async function fetchApi<T>(
+  endpoint: string,
+  options: RequestInit = {},
+  timeoutMs = 60000
+): Promise<T> {
+  const base = getApiBase();
   
-  const defaultOptions: RequestInit = {
-    headers: {
-      "Content-Type": "application/json",
-    },
-    ...options,
+  const finalUrl = `${base}${endpoint.startsWith('/') ? '' : '/'}${endpoint.replace(/^\//, '')}`;
+
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+ 
+  const headers: HeadersInit = {
+    Accept: "application/json",
+    ...(options.body ? { "Content-Type": "application/json" } : {}),
+    ...(options.headers || {})
   };
 
-  // For GET requests, we don't need a Content-Type header and we shouldn't have a body.
-  if (defaultOptions.method === 'GET' || !defaultOptions.method) {
-    delete (defaultOptions.headers as any)['Content-Type'];
-    delete defaultOptions.body;
-  }
-
-
   try {
-    const response = await fetch(url, defaultOptions);
+    const res = await fetch(finalUrl, {
+      cache: "no-store",
+      // @ts-ignore Next.js hint
+      next: { revalidate: 0 },
+      ...options,
+      headers,
+      signal: controller.signal
+    });
 
-    if (!response.ok) {
-      let errorData;
-      try {
-        errorData = await response.json();
-        // The backend seems to use 'error' or 'title' for error messages.
-        const message = errorData.error || errorData.title || `Request failed with status ${response.status}`;
-        const details = errorData.stack || errorData.detail || JSON.stringify(errorData, null, 2);
-        throw new Error(`${message}\n\n${details}`);
-
-      } catch (e) {
-        // Not a JSON response or other parsing error
-        const textResponse = await response.text();
-        throw new Error(`HTTP error! status: ${response.status}\n\n${textResponse}`);
-      }
+    let payload: any = null;
+    const text = await res.text();
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch {
+      payload = text;
     }
-    
-    // Handle cases where the response might be empty
-    const text = await response.text();
-    return text ? JSON.parse(text) : ({} as T);
 
-  } catch (error: any) {
-    console.error(`API call to ${url} failed:`, error);
-    // Don't re-throw the full stack trace from the server, just the message.
-    const cleanMessage = error.message.split('\n\n')[0];
-    throw new Error(cleanMessage || "An unknown network error occurred. Check API URL, CORS, and if the backend is running.");
+    if (!res.ok) {
+      const message =
+        (payload && (payload.error || payload.title || payload.message)) ||
+        `HTTP ${res.status} ${res.statusText}`;
+      const details =
+        (payload && (payload.stack || payload.detail)) ||
+        (typeof payload === "string" ? payload : JSON.stringify(payload, null, 2));
+      throw new Error(`${message}\n\n${details ?? ""}`.trim());
+    }
+
+    return payload as T;
+  } catch (err: any) {
+    if (err?.name === "AbortError") {
+      throw new Error(`Timeout (${timeoutMs} ms) llamando a ${finalUrl}`);
+    }
+    console.error(`API call to ${finalUrl} failed:`, err);
+    throw new Error(err?.message || "Fallo de red desconocido. Revisa URL, CORS y la API.");
+  } finally {
+    clearTimeout(id);
   }
 }
 
 export async function analyzeSchema(connectionString: string): Promise<SchemaResponse> {
-  const encodedConnectionString = encodeURIComponent(connectionString);
-  return fetchApi<SchemaResponse>(`/analyze/schema?connectionString=${encodedConnectionString}`, { method: 'GET' });
+  const qs = encodeURIComponent(connectionString);
+  return fetchApi<SchemaResponse>(`/analyze/schema?connectionString=${qs}`, { method: 'GET' });
 }
 
 export async function generatePlan(data: PlanRequest): Promise<PlanResponse> {
-    return fetchApi<PlanResponse>("/plan", {
-        method: "POST",
-        body: JSON.stringify(data)
-    });
+  return fetchApi<PlanResponse>("/plan", {
+    method: "POST",
+    body: JSON.stringify(data)
+  });
 }
 
-export async function runRefactor(data: Omit<RefactorRequest, 'apply'>, apply: boolean): Promise<RefactorResponse> {
-  const body: RefactorRequest = { ...data, apply };
-  return fetchApi<RefactorResponse>("/refactor/run", {
+export async function runApply(data: ApplyRequest): Promise<{
+  ok: boolean;
+  log?: string;
+  sql?: { renameSql?: string; compatSql?: string };
+}> {
+  return fetchApi("/apply", {
     method: "POST",
-    body: JSON.stringify(body),
+    body: JSON.stringify(data)
   });
 }
 
 export async function runCleanup(data: CleanupRequest): Promise<RefactorResponse> {
   return fetchApi<RefactorResponse>("/apply/cleanup", {
     method: "POST",
-    body: JSON.stringify(data),
+    body: JSON.stringify(data)
+  });
+}
+
+export async function runRefactor(
+  data: Omit<RefactorRequest, "apply">,
+  apply: boolean
+): Promise<RefactorResponse> {
+  const body: RefactorRequest = { ...data, apply };
+  return fetchApi<RefactorResponse>("/refactor/run", {
+    method: "POST",
+    body: JSON.stringify(body)
   });
 }
 
 export async function runCodeFix(data: CodeFixRequest): Promise<CodefixResult> {
-    return fetchApi<CodefixResult>("/codefix/run", {
-        method: "POST",
-        body: JSON.stringify(data),
-    });
+  return fetchApi<CodefixResult>("/codefix/run", {
+    method: "POST",
+    body: JSON.stringify(data)
+  });
 }
