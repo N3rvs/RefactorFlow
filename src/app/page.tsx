@@ -119,7 +119,7 @@ export default function RefactorPage() {
   const [schema, setSchema] = useState<SchemaResponse | null>(null);
   const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
   
-  const { toast } = useToast();
+  const { toast, dismiss } = useToast();
 
   const getErrorMessage = (error: unknown): string => {
     if (error instanceof Error) return error.message;
@@ -146,12 +146,14 @@ export default function RefactorPage() {
 
     try {
       const data = await apiFn();
-      toast.update(id, { variant: "default", title: toastMessages.success, duration: 3000 });
+      dismiss(id);
+      toast({ variant: "default", title: toastMessages.success, duration: 3000 });
       onSuccess(data);
       if(loadingState === 'analyze') setConnectionOk(true);
     } catch (err) {
       const errorMessage = getErrorMessage(err);
-      toast.update(id, { variant: "destructive", title: toastMessages.error, description: errorMessage, duration: 5000 });
+      dismiss(id);
+      toast({ variant: "destructive", title: toastMessages.error, description: errorMessage, duration: 5000 });
       if(loadingState === 'analyze') setConnectionOk(false);
     } finally {
       setLoading(false);
@@ -403,3 +405,5 @@ export default function RefactorPage() {
     </div>
   );
 }
+
+    
