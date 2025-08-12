@@ -26,7 +26,7 @@ async function fetchApi<T>(
 ): Promise<T> {
   const base = getApiBase();
   
-  const finalUrl = `${base}${endpoint.startsWith('/') ? '' : '/'}${endpoint.replace(/^\//, '')}`;
+  const finalUrl = `${base}/${endpoint.replace(/^\//, '')}`;
 
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
