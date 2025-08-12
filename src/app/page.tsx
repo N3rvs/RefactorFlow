@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -32,7 +33,9 @@ import {
   Menu,
   ChevronRight,
   Database,
-  Info
+  Info,
+  PlusCircle,
+  XCircle
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import ResultsPanel from "@/components/refactor/ResultsPanel";
@@ -107,9 +110,19 @@ const initialPlan: RefactorPlan = {
   renames: [],
 };
 
+const initialNewRename: Omit<RenameOperation, 'scope'> = {
+  tableFrom: "",
+  tableTo: "",
+  columnFrom: "",
+  columnTo: "",
+  type: "",
+};
+
+
 export default function RefactorPage() {
   const [connectionString, setConnectionString] = useState("server=myserver;Database=example;");
   const [plan, setPlan] = useState<RefactorPlan>(initialPlan);
+  const [newRename, setNewRename] = useState(initialNewRename);
   const [options, setOptions] = useState({ useSynonyms: true, useViews: true, cqrs: true });
   const [rootKey, setRootKey] = useState("SOLUTION");
   const [activePlanTab, setActivePlanTab] = useState<"table" | "column">("table");
@@ -203,6 +216,22 @@ export default function RefactorPage() {
     }
   );
 
+  const addRename = () => {
+    const operation: RenameOperation = {
+      scope: activePlanTab,
+      ...newRename,
+    };
+    if (!operation.tableFrom || (operation.scope === 'column' && !operation.columnFrom)) {
+        toast({ variant: 'destructive', title: 'Faltan campos obligatorios.' });
+        return;
+    }
+    setPlan(prev => ({ ...prev, renames: [...prev.renames, operation] }));
+    setNewRename(initialNewRename);
+  };
+  
+  const removeRename = (index: number) => {
+    setPlan(prev => ({ ...prev, renames: prev.renames.filter((_, i) => i !== index) }));
+  };
 
   const handleAiGeneratePlan = () => {
      toast({ title: "AI Plan Generation", description: "This feature is not yet implemented." });
@@ -296,6 +325,55 @@ export default function RefactorPage() {
                             <Button onClick={() => setActivePlanTab('table')} variant={activePlanTab === 'table' ? 'ghost' : 'ghost'} className={`w-full h-8 text-xs ${activePlanTab === 'table' ? 'bg-background shadow-sm' : ''}`}>Renombrar tabla</Button>
                             <Button onClick={() => setActivePlanTab('column')} variant={activePlanTab === 'column' ? 'ghost' : 'ghost'} className={`w-full h-8 text-xs ${activePlanTab === 'column' ? 'bg-background shadow-sm' : ''}`}>Renombrar columna</Button>
                         </div>
+                        {/* Formulario para añadir renames */}
+                        <div className="space-y-3 pt-2">
+                          <Input
+                            placeholder="Tabla Origen"
+                            value={newRename.tableFrom}
+                            onChange={(e) => setNewRename(prev => ({...prev, tableFrom: e.target.value}))}
+                          />
+                          {activePlanTab === 'column' && (
+                             <Input
+                              placeholder="Columna Origen"
+                              value={newRename.columnFrom}
+                              onChange={(e) => setNewRename(prev => ({...prev, columnFrom: e.target.value}))}
+                            />
+                          )}
+                           <Input
+                            placeholder={`${activePlanTab === 'table' ? 'Tabla' : 'Columna'} Destino`}
+                            value={activePlanTab === 'table' ? newRename.tableTo : newRename.columnTo}
+                            onChange={(e) => setNewRename(prev => activePlanTab === 'table' ? {...prev, tableTo: e.target.value} : {...prev, columnTo: e.target.value})}
+                          />
+                          <Button onClick={addRename} size="sm" className="w-full">
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Añadir al Plan
+                          </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                 <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base font-medium">Plan de Refactorización</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {plan.renames.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">Aún no hay cambios en el plan.</p>
+                      ) : (
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {plan.renames.map((op, index) => (
+                            <div key={index} className="flex items-center justify-between bg-muted/50 p-2 rounded-md">
+                                <div className="text-xs">
+                                    <Badge variant="outline" className="mr-2">{op.scope}</Badge>
+                                    <span className="font-mono">{op.scope === 'table' ? `${op.tableFrom} -> ${op.tableTo}` : `${op.tableFrom}.${op.columnFrom} -> ${op.columnTo}`}</span>
+                                </div>
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeRename(index)}>
+                                    <XCircle className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                 </Card>
                 
@@ -405,5 +483,7 @@ export default function RefactorPage() {
     </div>
   );
 }
+
+    
 
     
