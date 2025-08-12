@@ -37,70 +37,51 @@ import {
   PlusCircle,
   XCircle,
   Eye,
-  FileCode
+  FileCode,
+  Box,
+  SlidersHorizontal
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import ResultsPanel from "@/components/refactor/ResultsPanel";
+import { Checkbox } from "@/components/ui/checkbox";
 
 function SchemaViewer({ schema, onRefresh, loading }: { schema: SchemaResponse | null; onRefresh: () => void; loading: boolean }) {
     if (!schema && !loading) return (
-      <Card className="flex-grow">
+      <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-base font-medium">Esquema (opcional)</CardTitle>
+              <CardTitle className="text-sm font-medium">Esquema (opcional)</CardTitle>
           </CardHeader>
           <CardContent className="flex items-center justify-center text-muted-foreground h-48">
-            <p>Presiona "Check Connection" para cargar el esquema.</p>
+            <p className="text-xs">Presiona "Check Connection" para cargar el esquema.</p>
           </CardContent>
       </Card>
     );
 
     return (
-        <Card className="flex-grow">
+        <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-base font-medium">Esquema (opcional)</CardTitle>
+                <CardTitle className="text-sm font-medium">Esquema (opcional)</CardTitle>
                 <Button variant="ghost" size="sm" onClick={onRefresh} disabled={loading} className="text-xs">
-                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                    Refrescar esquema
+                    {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-2 h-3 w-3" />}
+                    Refrescar
                 </Button>
             </CardHeader>
             <CardContent>
                 {loading ? (
                     <div className="space-y-2 py-4">
-                        <div className="h-8 rounded-md bg-muted animate-pulse" />
-                        <div className="h-8 rounded-md bg-muted animate-pulse" />
-                        <div className="h-8 rounded-md bg-muted animate-pulse" />
+                        <div className="h-6 rounded-md bg-muted animate-pulse" />
+                        <div className="h-6 rounded-md bg-muted animate-pulse" />
+                        <div className="h-6 rounded-md bg-muted animate-pulse" />
                     </div>
                 ) : (
-                <Accordion type="multiple" className="w-full max-h-96 overflow-y-auto">
-                    {schema?.tables.map((table) => (
-                        <AccordionItem value={table.name} key={table.name}>
-                            <AccordionTrigger className="text-sm font-normal">
-                                <div className="flex items-center gap-2">
-                                    <Database className="h-4 w-4" />
-                                    {table.name}
-                                </div>
-                            </AccordionTrigger>
-                            <AccordionContent>
-                                <UiTable>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Columna</TableHead>
-                                            <TableHead>Tipo</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {table.columns.map((col) => (
-                                            <TableRow key={col.name}>
-                                                <TableCell>{col.name}</TableCell>
-                                                <TableCell>{col.sqlType}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </UiTable>
-                            </AccordionContent>
-                        </AccordionItem>
-                    ))}
-                </Accordion>
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+                  {schema?.tables.map((table) => (
+                    <div key={table.name} className="flex items-center space-x-2">
+                      <Checkbox id={`table-${table.name}`} />
+                      <label htmlFor={`table-${table.name}`} className="text-sm font-light text-muted-foreground">{table.name}</label>
+                    </div>
+                  ))}
+                </div>
                 )}
             </CardContent>
         </Card>
@@ -150,7 +131,7 @@ export default function RefactorPage() {
       toast({ variant: "destructive", title: "Connection string is required." });
       return;
     }
-     if (plan.renames.length === 0 && ['preview', 'apply', 'cleanup', 'plan'].includes(loadingState)) {
+     if (plan.renames.length === 0 && ['preview', 'apply', 'cleanup', 'plan', 'codefix'].includes(loadingState)) {
       toast({ variant: "destructive", title: "Refactor plan cannot be empty." });
       return;
     }
@@ -254,6 +235,18 @@ export default function RefactorPage() {
                           Historial
                       </SidebarMenuButton>
                   </SidebarMenuItem>
+                   <SidebarMenuItem>
+                      <SidebarMenuButton>
+                          <Box />
+                          Esquema
+                      </SidebarMenuButton>
+                  </SidebarMenuItem>
+                   <SidebarMenuItem>
+                      <SidebarMenuButton>
+                          <SlidersHorizontal />
+                          Ajustes
+                      </SidebarMenuButton>
+                  </SidebarMenuItem>
               </SidebarMenu>
           </SidebarContent>
           <SidebarFooter>
@@ -275,7 +268,7 @@ export default function RefactorPage() {
                 <div className="flex flex-1 items-center justify-end space-x-4">
                   <Badge variant="outline" className="text-xs font-normal">Development</Badge>
                   <Badge variant="secondary" className="text-xs font-normal flex items-center gap-2">
-                    <Globe className="h-3 w-3" />
+                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
                     https://localhost:7040
                   </Badge>
                   <Button variant="outline" size="icon" className="h-8 w-8">
@@ -285,14 +278,14 @@ export default function RefactorPage() {
             </div>
         </header>
         <main className="flex-grow p-4 sm:p-6 lg:p-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
               
-              <div className="col-span-1 flex flex-col gap-6">
+              <div className="col-span-2 flex flex-col gap-6">
                 <Card>
                     <CardHeader>
                         <CardTitle className="font-medium text-base">Connection</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent>
                         <div>
                             <Label htmlFor="connection-string" className="text-xs text-muted-foreground">Connection String</Label>
                             <Textarea
@@ -304,11 +297,11 @@ export default function RefactorPage() {
                               className="font-mono text-sm mt-1 bg-background"
                             />
                         </div>
-                        <div className="flex space-x-1 rounded-md bg-muted p-1">
-                            <Button onClick={() => setActivePlanTab('table')} variant={activePlanTab === 'table' ? 'ghost' : 'ghost'} className={`w-full h-8 text-xs ${activePlanTab === 'table' ? 'bg-background shadow-sm' : ''}`}>Renombrar tabla</Button>
-                            <Button onClick={() => setActivePlanTab('column')} variant={activePlanTab === 'column' ? 'ghost' : 'ghost'} className={`w-full h-8 text-xs ${activePlanTab === 'column' ? 'bg-background shadow-sm' : ''}`}>Renombrar columna</Button>
+                        <div className="flex space-x-1 rounded-md bg-muted p-1 mt-4">
+                            <Button onClick={() => setActivePlanTab('table')} variant={activePlanTab === 'table' ? 'ghost' : 'ghost'} className={`w-full h-8 text-xs ${activePlanTab === 'table' ? 'bg-card shadow-sm' : ''}`}>Renombrar tabla</Button>
+                            <Button onClick={() => setActivePlanTab('column')} variant={activePlanTab === 'column' ? 'ghost' : 'ghost'} className={`w-full h-8 text-xs ${activePlanTab === 'column' ? 'bg-card shadow-sm' : ''}`}>Renombrar columna</Button>
                         </div>
-                        <div className="space-y-3 pt-2">
+                        <div className="space-y-3 pt-4">
                           <Input
                             placeholder="Tabla Origen"
                             value={newRename.tableFrom}
@@ -367,64 +360,63 @@ export default function RefactorPage() {
                         <div className="flex items-center justify-between">
                             <Label htmlFor="use-synonyms" className="text-sm font-light flex items-center gap-2">
                                 Use Synonyms
-                                <Info className="h-3 w-3 text-muted-foreground" />
                             </Label>
                             <Switch id="use-synonyms" checked={options.useSynonyms} onCheckedChange={(checked) => setOptions(prev => ({...prev, useSynonyms: checked}))} />
                         </div>
                         <div className="flex items-center justify-between">
                              <Label htmlFor="use-views" className="text-sm font-light flex items-center gap-2">
                                 Use Views
-                                <Info className="h-3 w-3 text-muted-foreground" />
                             </Label>
                             <Switch id="use-views" checked={options.useViews} onCheckedChange={(checked) => setOptions(prev => ({...prev, useViews: checked}))} />
                         </div>
                         <div className="flex items-center justify-between">
                              <Label htmlFor="cqrs" className="text-sm font-light flex items-center gap-2">
-                                CQRS
+                                CORS
                              </Label>
                              <Switch id="cqrs" checked={options.cqrs} onCheckedChange={(checked) => setOptions(prev => ({...prev, cqrs: checked}))} />
                         </div>
+                        <p className="text-xs text-muted-foreground pt-2">Las vistas de solo lectura y los sinónimos permiten que el código cliente heredado funcione sin cambios inmediatos.</p>
                     </CardContent>
                 </Card>
 
               </div>
 
-              <div className="col-span-1 flex flex-col gap-6">
-                <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base font-medium">Acciones</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <Button variant="outline" className="w-full justify-start" onClick={() => handleRefactor(false)} disabled={loading === 'preview'}>
-                          {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
-                          Preview DB + Code
-                      </Button>
-                       <Button variant="outline" className="w-full justify-start" onClick={() => handleCodefix(false)} disabled={loading === 'codefix'}>
-                          {loading === 'codefix' ? <Loader2 className="animate-spin" /> : <FileCode/>}
-                          Preview Code-only
-                      </Button>
-                       <Button variant="outline" className="w-full justify-start" onClick={handlePlan} disabled={loading === 'plan'}>
-                          {loading === 'plan' ? <Loader2 className="animate-spin" /> : <FileText/>}
-                          Generate SQL Plan
-                      </Button>
-                      
-                      <div className="border-t border-border pt-4 space-y-3">
-                        <Button variant="destructive" className="w-full" onClick={() => handleRefactor(true)} disabled={loading === 'apply' || !result || result.apply === true}>
-                            {loading === 'apply' ? <Loader2 className="animate-spin" /> : null}
-                            Aplicar Cambios
-                        </Button>
-                        <Button variant="secondary" className="w-full" onClick={handleCleanup} disabled={loading === 'cleanup'}>
-                           {loading === 'cleanup' ? <Loader2 className="animate-spin" /> : null}
-                           Cleanup Compat Objects
-                        </Button>
-                      </div>
-                    </CardContent>
-                </Card>
-                <SchemaViewer schema={schema} onRefresh={handleAnalyze} loading={loading === 'analyze'} />
-              </div>
-
-              <div className="col-span-1">
-                 <ResultsPanel result={result} loading={!!loading} error={result?.error || null} />
+              <div className="col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                  <div className="col-span-2">
+                    <ResultsPanel result={result} loading={!!loading} error={result?.error || null} />
+                  </div>
+                  <div className="col-span-1">
+                     <Card>
+                        <CardHeader>
+                          <CardTitle className="text-base font-medium">Acciones</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                           <Button variant="outline" className="w-full justify-start" onClick={() => handleRefactor(false)} disabled={loading === 'preview'}>
+                              {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
+                              Preview
+                          </Button>
+                           <Button variant="outline" className="w-full justify-start" onClick={handlePlan} disabled={loading === 'plan'}>
+                              {loading === 'plan' ? <Loader2 className="animate-spin" /> : <FileText/>}
+                              Generate SQL
+                          </Button>
+                          <Button variant="destructive" className="w-full" onClick={() => handleRefactor(true)} disabled={loading === 'apply' || !result || result.apply === true}>
+                                {loading === 'apply' ? <Loader2 className="animate-spin" /> : null}
+                                Aplicar
+                          </Button>
+                           <Button variant="secondary" className="w-full" onClick={handleCleanup} disabled={loading === 'cleanup'}>
+                               {loading === 'cleanup' ? <Loader2 className="animate-spin" /> : null}
+                               Cleanup
+                            </Button>
+                             <Button variant="outline" className="w-full justify-start" onClick={handleAnalyze} disabled={loading === 'analyze'}>
+                              {loading === 'analyze' ? <Loader2 className="animate-spin" /> : <Database/>}
+                              Analyze
+                          </Button>
+                        </CardContent>
+                    </Card>
+                  </div>
+                   <div className="col-span-1">
+                      <SchemaViewer schema={schema} onRefresh={handleAnalyze} loading={loading === 'analyze'} />
+                   </div>
               </div>
             </div>
         </main>
@@ -432,3 +424,6 @@ export default function RefactorPage() {
     </div>
   );
 }
+
+
+    

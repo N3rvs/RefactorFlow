@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -57,7 +58,7 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
 
     return (
       <Tabs defaultValue="summary" className="w-full">
-        <div className="px-6 pt-6">
+        <div className="px-6 pt-0">
           <TabsList className="grid w-full grid-cols-4 bg-muted/50">
             <TabsTrigger value="summary">Resumen</TabsTrigger>
             <TabsTrigger value="sql">SQL</TabsTrigger>
@@ -198,3 +199,5 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
     </Card>
   );
 }
+
+    
