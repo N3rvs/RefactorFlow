@@ -1,7 +1,7 @@
 "use client";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -149,9 +149,6 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
         <CardTitle className="flex items-center gap-2">
             <FileText /> Result
         </CardTitle>
-        <CardDescription>
-          View the outcome of the refactoring operation.
-        </CardDescription>
       </CardHeader>
       <CardContent>{renderContent()}</CardContent>
     </Card>
