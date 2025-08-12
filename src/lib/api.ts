@@ -30,6 +30,13 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
     ...options,
   };
 
+  // For GET requests, we don't need a Content-Type header and we shouldn't have a body.
+  if (defaultOptions.method === 'GET' || !defaultOptions.method) {
+    delete (defaultOptions.headers as any)['Content-Type'];
+    delete defaultOptions.body;
+  }
+
+
   try {
     const response = await fetch(url, defaultOptions);
 
@@ -49,16 +56,21 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
       }
     }
     
-    return await response.json();
+    // Handle cases where the response might be empty
+    const text = await response.text();
+    return text ? JSON.parse(text) : ({} as T);
+
   } catch (error: any) {
     console.error(`API call to ${url} failed:`, error);
-    throw new Error(error.message || "An unknown network error occurred. Check API URL, CORS, and if the backend is running.");
+    // Don't re-throw the full stack trace from the server, just the message.
+    const cleanMessage = error.message.split('\n\n')[0];
+    throw new Error(cleanMessage || "An unknown network error occurred. Check API URL, CORS, and if the backend is running.");
   }
 }
 
 export async function analyzeSchema(connectionString: string): Promise<SchemaResponse> {
   const encodedConnectionString = encodeURIComponent(connectionString);
-  return fetchApi<SchemaResponse>(`/analyze/schema?connectionString=${encodedConnectionString}`);
+  return fetchApi<SchemaResponse>(`/analyze/schema?connectionString=${encodedConnectionString}`, { method: 'GET' });
 }
 
 export async function generatePlan(data: PlanRequest): Promise<PlanResponse> {
