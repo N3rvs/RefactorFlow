@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -217,11 +218,19 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
   };
 
   return (
-    <Card className="sticky top-20">
-      <CardHeader>
+    <Card>
+       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base font-medium flex items-center gap-2">
             <FileText className="h-4 w-4" /> Resultado
         </CardTitle>
+        {result && (
+            <div className="flex items-center gap-2 text-sm">
+                <span className={`w-2 h-2 rounded-full ${result.ok ? 'bg-green-500' : 'bg-destructive'}`}></span>
+                <Badge variant={result.ok ? "default" : "destructive"} className={`text-xs ${result.ok ? 'bg-green-500/20 text-green-300 border-green-500/30' : ''}`}>
+                    {result.apply ? 'Applied' : 'Preview'} - {result.ok ? "OK" : "Failed"}
+                </Badge>
+            </div>
+        )}
       </CardHeader>
       <CardContent className="p-0">{renderContent()}</CardContent>
     </Card>

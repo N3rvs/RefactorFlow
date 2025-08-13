@@ -476,7 +476,7 @@ export default function RefactorPage() {
         <main className="flex-grow p-4 sm:p-6 lg:p-8">
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start h-full">
               
-              <div className="col-span-2 flex flex-col gap-6">
+              <div className="lg:col-span-2 flex flex-col gap-6">
                 <Card>
                     <CardHeader>
                         <CardTitle className="font-medium text-base">Connection</CardTitle>
@@ -536,7 +536,7 @@ export default function RefactorPage() {
 
               </div>
 
-              <div className="col-span-3 flex flex-col gap-6">
+              <div className="lg:col-span-3 flex flex-col gap-6">
                   <SchemaViewer 
                     schema={schema} 
                     onRefresh={handleAnalyze} 
