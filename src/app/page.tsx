@@ -39,17 +39,69 @@ import {
   Eye,
   FileCode,
   Box,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Pencil
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import ResultsPanel from "@/components/refactor/ResultsPanel";
 import { Checkbox } from "@/components/ui/checkbox";
 
-function SchemaViewer({ schema, onRefresh, loading }: { schema: SchemaResponse | null; onRefresh: () => void; loading: boolean }) {
+function SchemaViewer({ 
+    schema, 
+    onRefresh, 
+    loading,
+    plan,
+    onPlanChange
+}: { 
+    schema: SchemaResponse | null; 
+    onRefresh: () => void; 
+    loading: boolean;
+    plan: RefactorPlan;
+    onPlanChange: (newPlan: RefactorPlan) => void;
+}) {
     const hasSchema = schema && schema.tables && schema.tables.length > 0;
 
+    const handleTableNameChange = (originalName: string, newName: string) => {
+        const existingRename = plan.renames.find(r => r.scope === 'table' && r.tableFrom === originalName);
+        if (existingRename) {
+            const updatedRenames = plan.renames.map(r => 
+                r.scope === 'table' && r.tableFrom === originalName ? { ...r, tableTo: newName } : r
+            );
+            onPlanChange({ ...plan, renames: updatedRenames.filter(r => r.tableTo !== originalName) });
+        } else if (newName && newName !== originalName) {
+            const newRename: RenameOperation = {
+                scope: 'table',
+                tableFrom: originalName,
+                tableTo: newName,
+            };
+            onPlanChange({ ...plan, renames: [...plan.renames, newRename] });
+        }
+    };
+    
+    const handleColumnNameChange = (tableName: string, originalName: string, newName: string) => {
+        const existingRename = plan.renames.find(r => r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === originalName);
+
+        if (existingRename) {
+            const updatedRenames = plan.renames.map(r => 
+                (r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === originalName) 
+                ? { ...r, columnTo: newName } 
+                : r
+            );
+             onPlanChange({ ...plan, renames: updatedRenames.filter(r => r.columnTo !== originalName) });
+        } else if (newName && newName !== originalName) {
+            const newRename: RenameOperation = {
+                scope: 'column',
+                tableFrom: tableName,
+                columnFrom: originalName,
+                columnTo: newName,
+            };
+            onPlanChange({ ...plan, renames: [...plan.renames, newRename] });
+        }
+    };
+
+
     return (
-        <Card className="sticky top-20">
+        <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-base font-medium">Esquema de Base de Datos</CardTitle>
                 <Button variant="ghost" size="sm" onClick={onRefresh} disabled={loading} className="text-xs">
@@ -73,20 +125,31 @@ function SchemaViewer({ schema, onRefresh, loading }: { schema: SchemaResponse |
                     </div>
                 )}
                 {hasSchema && !loading && (
-                    <Accordion type="multiple" className="w-full max-h-[70vh] overflow-y-auto pr-2">
+                    <Accordion type="multiple" className="w-full max-h-[calc(100vh-12rem)] overflow-y-auto pr-2">
                         {schema.tables.map((table) => (
                             <AccordionItem value={table.name} key={table.name}>
-                                <div className="flex items-center text-sm font-light text-muted-foreground hover:no-underline hover:text-foreground py-2">
-                                  <Checkbox id={`table-${table.name}`} className="mr-2"/>
-                                  <AccordionTrigger noChevron>
-                                      <label htmlFor={`table-${table.name}`} className="cursor-pointer flex-1">{table.name}</label>
-                                  </AccordionTrigger>
-                                </div>
+                                <AccordionTrigger>
+                                  <div className="flex items-center gap-2 flex-1 group">
+                                     <Pencil className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
+                                     <Input 
+                                        defaultValue={table.name}
+                                        className="h-8 border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent"
+                                        onBlur={(e) => handleTableNameChange(table.name, e.target.value)}
+                                     />
+                                  </div>
+                                </AccordionTrigger>
                                 <AccordionContent className="pl-6">
                                     <div className="space-y-1">
                                         {table.columns.map(col => (
-                                            <div key={col.name} className="flex justify-between items-center text-xs">
-                                                <span className="text-muted-foreground">{col.name}</span>
+                                            <div key={col.name} className="flex justify-between items-center text-xs group">
+                                                <div className="flex items-center gap-2 flex-1">
+                                                   <Pencil className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
+                                                   <Input 
+                                                      defaultValue={col.name}
+                                                      className="h-7 text-xs border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent"
+                                                      onBlur={(e) => handleColumnNameChange(table.name, col.name, e.target.value)}
+                                                   />
+                                                </div>
                                                 <Badge variant="outline" className="font-mono text-sky-400 border-sky-400/30">{col.sqlType}</Badge>
                                             </div>
                                         ))}
@@ -117,10 +180,8 @@ const initialNewRename: Omit<RenameOperation, 'scope'> = {
 export default function RefactorPage() {
   const [connectionString, setConnectionString] = useState("Server=NERVELESS;Database=StoreGuille;Trusted_Connection=True;Encrypt=True;TrustServerCertificate=True;");
   const [plan, setPlan] = useState<RefactorPlan>(initialPlan);
-  const [newRename, setNewRename] = useState(initialNewRename);
   const [options, setOptions] = useState({ useSynonyms: true, useViews: true, cqrs: true });
   const [rootKey, setRootKey] = useState("SOLUTION");
-  const [activePlanTab, setActivePlanTab] = useState<"table" | "column">("table");
   
   const [loading, setLoading] = useState<"preview" | "apply" | "cleanup" | "analyze" | "plan" | "codefix" | false>(false);
   const [result, setResult] = useState<RefactorResponse | null>(null);
@@ -210,23 +271,21 @@ export default function RefactorPage() {
       error: "Failed to run CodeFix."
     }
   );
-
-  const addRename = () => {
-    const operation: RenameOperation = {
-      scope: activePlanTab,
-      ...newRename,
-    };
-    if (!operation.tableFrom || (operation.scope === 'column' && !operation.columnFrom)) {
-        toast({ variant: 'destructive', title: 'Faltan campos obligatorios.' });
-        return;
-    }
-    setPlan(prev => ({ ...prev, renames: [...prev.renames, operation] }));
-    setNewRename(initialNewRename);
-  };
   
   const removeRename = (index: number) => {
     setPlan(prev => ({ ...prev, renames: prev.renames.filter((_, i) => i !== index) }));
   };
+  
+  useEffect(() => {
+    if (result) {
+        toast({
+            title: `Operación ${result.ok ? "exitosa" : "fallida"}`,
+            description: result.error ? getErrorMessage(result.error) : (result.dbLog || result.log || "La operación se completó."),
+            variant: result.ok ? "default" : "destructive",
+            duration: 5000
+        })
+    }
+  }, [result, toast]);
 
   return (
     <div className="flex min-h-screen bg-background text-foreground font-sans">
@@ -291,7 +350,7 @@ export default function RefactorPage() {
             </div>
         </header>
         <main className="flex-grow p-4 sm:p-6 lg:p-8">
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start h-full">
               
               <div className="col-span-2 flex flex-col gap-6">
                 <Card>
@@ -309,33 +368,6 @@ export default function RefactorPage() {
                               onChange={(e) => setConnectionString(e.target.value)}
                               className="font-mono text-sm mt-1 bg-background"
                             />
-                        </div>
-                        <div className="flex space-x-1 rounded-md bg-muted p-1 mt-4">
-                            <Button onClick={() => setActivePlanTab('table')} variant={activePlanTab === 'table' ? 'ghost' : 'ghost'} className={`w-full h-8 text-xs ${activePlanTab === 'table' ? 'bg-card shadow-sm' : ''}`}>Renombrar tabla</Button>
-                            <Button onClick={() => setActivePlanTab('column')} variant={activePlanTab === 'column' ? 'ghost' : 'ghost'} className={`w-full h-8 text-xs ${activePlanTab === 'column' ? 'bg-card shadow-sm' : ''}`}>Renombrar columna</Button>
-                        </div>
-                        <div className="space-y-3 pt-4">
-                          <Input
-                            placeholder="Tabla Origen"
-                            value={newRename.tableFrom}
-                            onChange={(e) => setNewRename(prev => ({...prev, tableFrom: e.target.value}))}
-                          />
-                          {activePlanTab === 'column' && (
-                             <Input
-                              placeholder="Columna Origen"
-                              value={newRename.columnFrom}
-                              onChange={(e) => setNewRename(prev => ({...prev, columnFrom: e.target.value}))}
-                            />
-                          )}
-                           <Input
-                            placeholder={`${activePlanTab === 'table' ? 'Tabla' : 'Columna'} Destino`}
-                            value={activePlanTab === 'table' ? newRename.tableTo : newRename.columnTo}
-                            onChange={(e) => setNewRename(prev => activePlanTab === 'table' ? {...prev, tableTo: e.target.value} : {...prev, columnTo: e.target.value})}
-                          />
-                          <Button onClick={addRename} size="sm" className="w-full">
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Añadir al Plan
-                          </Button>
                         </div>
                     </CardContent>
                 </Card>
@@ -417,7 +449,13 @@ export default function RefactorPage() {
               </div>
 
               <div className="col-span-3">
-                  <SchemaViewer schema={schema} onRefresh={handleAnalyze} loading={loading === 'analyze'} />
+                  <SchemaViewer 
+                    schema={schema} 
+                    onRefresh={handleAnalyze} 
+                    loading={loading === 'analyze'}
+                    plan={plan}
+                    onPlanChange={setPlan}
+                   />
               </div>
             </div>
         </main>
@@ -425,3 +463,5 @@ export default function RefactorPage() {
     </div>
   );
 }
+
+    
