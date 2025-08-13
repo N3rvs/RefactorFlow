@@ -99,14 +99,29 @@ export interface Column {
     name: string;
     sqlType: string;
     isNullable: boolean;
+    isPrimaryKey?: boolean;
+}
+
+export interface ForeignKey {
+  name: string;
+  columnName: string;
+  referencesTable: string;
+  referencesColumn: string;
+}
+
+export interface Index {
+    name: string;
+    columns: string[];
+    isPrimary: boolean;
+    isUnique: boolean;
 }
 
 export interface Table {
     schema: string;
     name: string;
     columns: Column[];
-    foreignKeys: any[];
-    indexes: any[];
+    foreignKeys: ForeignKey[];
+    indexes: Index[];
 }
 
 export interface SchemaResponse {

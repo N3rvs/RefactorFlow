@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { RefactorPlan, RefactorResponse, CleanupRequest, RefactorRequest, SchemaResponse, RenameOperation, PlanRequest } from "@/lib/types";
 import { runRefactor, runCleanup, analyzeSchema, generatePlan, runCodeFix } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -44,7 +44,9 @@ import {
   SlidersHorizontal,
   Pencil,
   Sparkles,
-  Play
+  Play,
+  KeyRound,
+  Link2
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import ResultsPanel from "@/components/refactor/ResultsPanel";
@@ -173,6 +175,19 @@ function SchemaViewer({
         delete tempNewCols[id];
         setNewColumns(tempNewCols);
     };
+    
+    const enhancedTables = React.useMemo(() => {
+        if (!schema?.tables) return [];
+        return schema.tables.map(table => {
+            const pkIndex = table.indexes?.find(idx => idx.isPrimary);
+            const pkColumns = pkIndex ? pkIndex.columns : [];
+            const columnsWithPk = table.columns.map(col => ({
+                ...col,
+                isPrimaryKey: pkColumns.includes(col.name)
+            }));
+            return { ...table, columns: columnsWithPk };
+        });
+    }, [schema]);
 
     return (
         <Card>
@@ -203,7 +218,7 @@ function SchemaViewer({
                 )}
                 {hasSchema && !loading && (
                     <Accordion type="multiple" className="w-full max-h-[calc(100vh-20rem)] overflow-y-auto pr-2">
-                        {schema.tables.map((table) => (
+                        {enhancedTables.map((table) => (
                             <AccordionItem value={table.name} key={table.name}>
                                 <AccordionTrigger>
                                   <div className="flex items-center gap-2 flex-1 group mr-4">
@@ -221,7 +236,11 @@ function SchemaViewer({
                                         {table.columns.map(col => (
                                             <div key={col.name} className="flex justify-between items-center text-xs group gap-2">
                                                 <div className="flex items-center gap-2 flex-1">
-                                                   <Pencil className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
+                                                    {col.isPrimaryKey ? (
+                                                        <KeyRound className="h-3 w-3 text-amber-400" />
+                                                    ) : (
+                                                        <Pencil className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
+                                                    )}
                                                    <Input 
                                                       defaultValue={col.name}
                                                       className="h-7 text-xs border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent"
@@ -263,6 +282,21 @@ function SchemaViewer({
                                             <PlusCircle className="mr-2 h-3 w-3" /> Add Column
                                         </Button>
                                     </div>
+                                    {table.foreignKeys && table.foreignKeys.length > 0 && (
+                                        <div className="mt-4 pt-2 border-t border-border/50">
+                                            <p className="text-xs font-medium text-muted-foreground mb-2">Foreign Keys</p>
+                                            <div className="space-y-1">
+                                                {table.foreignKeys.map(fk => (
+                                                    <div key={fk.name} className="flex items-center text-xs text-muted-foreground gap-2 font-mono">
+                                                        <Link2 className="h-3 w-3 text-cyan-400"/>
+                                                        <span>{fk.columnName}</span>
+                                                        <span className="text-foreground">→</span>
+                                                        <span>{fk.referencesTable}.{fk.referencesColumn}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </AccordionContent>
                             </AccordionItem>
                         ))}
