@@ -224,7 +224,7 @@ export default function RefactorPage() {
       toast({ variant: "destructive", title: "Connection string is required." });
       return;
     }
-     if (plan.renames.length === 0 && ['preview', 'apply', 'cleanup', 'plan', 'codefix'].includes(loadingState)) {
+     if (plan.renames.length === 0 && !['analyze'].includes(loadingState)) {
       toast({ variant: "destructive", title: "Refactor plan cannot be empty." });
       return;
     }
@@ -258,14 +258,14 @@ export default function RefactorPage() {
   const handlePlan = () => handleApiCall(
     () => generatePlan({ renames: plan.renames, ...options }),
     "plan",
-    (data) => setResult(prev => ({ ...prev, sql: data.sql, ok: true })),
+    (data) => setResult(prev => ({ ...prev, sql: data.sql, ok: true, apply: false, codefix: prev?.codefix || null, dbLog: prev?.dbLog, log: prev?.log })),
     { loading: "Generating plan...", success: "Plan generated.", error: "Failed to generate plan." }
   );
 
   const handleRefactor = (apply: boolean) => handleApiCall(
     () => runRefactor({ connectionString, plan, rootKey, ...options }, apply),
     apply ? "apply" : "preview",
-    (data) => setResult(data),
+    (data) => setResult(prev => ({ ...prev, ...data })),
     { 
       loading: apply ? "Aplicando cambios..." : "Generando preview...",
       success: apply ? "Cambios aplicados." : "Preview generada.",
@@ -283,7 +283,7 @@ export default function RefactorPage() {
   const handleCodefix = (apply: boolean) => handleApiCall(
     () => runCodeFix({ rootKey, plan, apply }),
     "codefix",
-    (data) => setResult(prev => ({ ...prev, codefix: data, ok: data.ok })),
+    (data) => setResult(prev => ({ ...prev, codefix: data, ok: data.ok, apply: apply, sql: prev?.sql || null })),
     { 
       loading: apply ? "Applying code fixes..." : "Previewing code fixes...",
       success: apply ? "Code fixes applied." : "Code fix preview generated.",
