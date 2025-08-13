@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table as UiTable, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Separator } from "@/components/ui/separator";
 import {
   Wand2,
   History,
@@ -181,7 +182,7 @@ function SchemaViewer({
 
 
     return (
-        <Card className="h-full">
+        <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-base font-medium">Esquema de Base de Datos</CardTitle>
                 <Button variant="ghost" size="sm" onClick={onRefresh} disabled={loading} className="text-xs">
@@ -280,7 +281,8 @@ const initialPlan: RefactorPlan = {
   renames: [],
 };
 
-const initialNewRename: Omit<RenameOperation, 'scope'> = {
+const initialNewRename: RenameOperation = {
+  scope: "table",
   tableFrom: "",
   tableTo: "",
   columnFrom: "",
@@ -292,6 +294,7 @@ const initialNewRename: Omit<RenameOperation, 'scope'> = {
 export default function RefactorPage() {
   const [connectionString, setConnectionString] = useState("Server=NERVELESS;Database=StoreGuille;Trusted_Connection=True;Encrypt=True;TrustServerCertificate=True;");
   const [plan, setPlan] = useState<RefactorPlan>(initialPlan);
+  const [newRename, setNewRename] = useState<RenameOperation>(initialNewRename);
   const [options, setOptions] = useState({ useSynonyms: true, useViews: true, cqrs: true });
   const [rootKey, setRootKey] = useState("SOLUTION");
   
@@ -383,6 +386,15 @@ export default function RefactorPage() {
       error: "Failed to run CodeFix."
     }
   );
+  
+  const handleAddManualRename = () => {
+    if (!newRename.tableFrom) {
+      toast({ variant: "destructive", title: "Table From is required" });
+      return;
+    }
+    setPlan(prev => ({ ...prev, renames: [...prev.renames, newRename] }));
+    setNewRename(initialNewRename);
+  };
   
   const removeRename = (index: number) => {
     setPlan(prev => ({ ...prev, renames: prev.renames.filter((_, i) => i !== index) }));
@@ -536,7 +548,60 @@ export default function RefactorPage() {
                     <CardHeader>
                       <CardTitle className="text-base font-medium">Plan de Refactorización</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                     <CardContent className="space-y-4">
+                        <Accordion type="single" collapsible>
+                            <AccordionItem value="manual-add">
+                                <AccordionTrigger className="text-sm">Añadir operación manual</AccordionTrigger>
+                                <AccordionContent className="space-y-3 pt-4">
+                                     <div className="grid grid-cols-2 gap-3">
+                                         <div>
+                                            <Label className="text-xs">Scope</Label>
+                                            <select
+                                                value={newRename.scope}
+                                                onChange={(e) => setNewRename(prev => ({ ...prev, scope: e.target.value as "table" | "column" | "add-column" }))}
+                                                className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                                            >
+                                                <option value="table">Table</option>
+                                                <option value="column">Column</option>
+                                                <option value="add-column">Add Column</option>
+                                            </select>
+                                        </div>
+                                         <div>
+                                            <Label className="text-xs">Table From</Label>
+                                            <Input value={newRename.tableFrom} onChange={(e) => setNewRename(prev => ({ ...prev, tableFrom: e.target.value }))} className="h-9 text-sm" />
+                                        </div>
+                                    </div>
+                                    {newRename.scope === 'table' && (
+                                        <div>
+                                            <Label className="text-xs">Table To</Label>
+                                            <Input value={newRename.tableTo} onChange={(e) => setNewRename(prev => ({ ...prev, tableTo: e.target.value }))} className="h-9 text-sm" />
+                                        </div>
+                                    )}
+                                    {newRename.scope === 'column' && (
+                                         <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <Label className="text-xs">Column From</Label>
+                                                <Input value={newRename.columnFrom} onChange={(e) => setNewRename(prev => ({ ...prev, columnFrom: e.target.value }))} className="h-9 text-sm" />
+                                            </div>
+                                            <div>
+                                                <Label className="text-xs">Column To</Label>
+                                                <Input value={newRename.columnTo} onChange={(e) => setNewRename(prev => ({ ...prev, columnTo: e.target.value }))} className="h-9 text-sm" />
+                                            </div>
+                                        </div>
+                                    )}
+                                    {(newRename.scope === 'column' || newRename.scope === 'add-column') && (
+                                         <div>
+                                            <Label className="text-xs">Type</Label>
+                                            <Input value={newRename.type} onChange={(e) => setNewRename(prev => ({ ...prev, type: e.target.value }))} className="h-9 text-sm" />
+                                        </div>
+                                    )}
+                                    <Button size="sm" onClick={handleAddManualRename} className="w-full">Añadir al plan</Button>
+                                </AccordionContent>
+                            </AccordionItem>
+                        </Accordion>
+
+                        <Separator />
+
                       {plan.renames.length === 0 ? (
                         <p className="text-sm text-muted-foreground text-center py-4">Aún no hay cambios en el plan.</p>
                       ) : (
