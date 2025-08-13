@@ -46,16 +46,18 @@ import ResultsPanel from "@/components/refactor/ResultsPanel";
 import { Checkbox } from "@/components/ui/checkbox";
 
 function SchemaViewer({ schema, onRefresh, loading }: { schema: SchemaResponse | null; onRefresh: () => void; loading: boolean }) {
-    if (!schema && !loading) return (
-      <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Esquema (opcional)</CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-center justify-center text-muted-foreground h-48">
-            <p className="text-xs">Presiona "Check Connection" para cargar el esquema.</p>
-          </CardContent>
-      </Card>
-    );
+    if (!schema && !loading) {
+        return (
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Esquema (opcional)</CardTitle>
+                </CardHeader>
+                <CardContent className="flex items-center justify-center text-muted-foreground h-48">
+                    <p className="text-xs">Presiona "Check Connection" para cargar el esquema.</p>
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
         <Card>
@@ -74,14 +76,28 @@ function SchemaViewer({ schema, onRefresh, loading }: { schema: SchemaResponse |
                         <div className="h-6 rounded-md bg-muted animate-pulse" />
                     </div>
                 ) : (
-                <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
-                  {schema?.tables.map((table) => (
-                    <div key={table.name} className="flex items-center space-x-2">
-                      <Checkbox id={`table-${table.name}`} />
-                      <label htmlFor={`table-${table.name}`} className="text-sm font-light text-muted-foreground">{table.name}</label>
-                    </div>
-                  ))}
-                </div>
+                    <Accordion type="multiple" className="w-full max-h-64 overflow-y-auto pr-2">
+                        {schema?.tables.map((table) => (
+                            <AccordionItem value={table.name} key={table.name}>
+                                <AccordionTrigger className="text-sm font-light text-muted-foreground hover:no-underline hover:text-foreground py-2">
+                                    <div className="flex items-center space-x-2">
+                                        <Checkbox id={`table-${table.name}`} />
+                                        <label htmlFor={`table-${table.name}`} className="cursor-pointer">{table.name}</label>
+                                    </div>
+                                </AccordionTrigger>
+                                <AccordionContent className="pl-6">
+                                    <div className="space-y-1">
+                                        {table.columns.map(col => (
+                                            <div key={col.name} className="flex justify-between items-center text-xs">
+                                                <span className="text-muted-foreground">{col.name}</span>
+                                                <Badge variant="outline" className="font-mono text-sky-400 border-sky-400/30">{col.sqlType}</Badge>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </AccordionContent>
+                            </AccordionItem>
+                        ))}
+                    </Accordion>
                 )}
             </CardContent>
         </Card>
@@ -425,5 +441,7 @@ export default function RefactorPage() {
   );
 }
 
+
+    
 
     
