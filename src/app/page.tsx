@@ -62,6 +62,8 @@ function SchemaViewer({
     onPlanChange: (newPlan: RefactorPlan) => void;
 }) {
     const hasSchema = schema && schema.tables && schema.tables.length > 0;
+    const [newColumns, setNewColumns] = useState<Record<string, { name: string; type: string }>>({});
+
 
     const handleTableNameChange = (originalName: string, newName: string) => {
         // Remove existing rename for this table if new name is same as original
@@ -145,6 +147,38 @@ function SchemaViewer({
         onPlanChange({ ...plan, renames: updatedRenames });
     };
 
+    const handleAddNewColumn = (tableName: string) => {
+        const newId = `new-${tableName}-${Date.now()}`;
+        setNewColumns(prev => ({...prev, [newId]: { name: '', type: '' }}));
+    };
+
+    const handleNewColumnChange = (id: string, field: 'name' | 'type', value: string) => {
+        setNewColumns(prev => ({ ...prev, [id]: { ...prev[id], [field]: value }}));
+    };
+
+    const confirmAddColumn = (id: string, tableName: string) => {
+        const newColumn = newColumns[id];
+        if (newColumn && newColumn.name && newColumn.type) {
+            const newRename: RenameOperation = {
+                scope: 'add-column',
+                tableFrom: tableName,
+                columnTo: newColumn.name,
+                type: newColumn.type,
+            };
+            onPlanChange({ ...plan, renames: [...plan.renames, newRename] });
+            
+            const tempNewCols = {...newColumns};
+            delete tempNewCols[id];
+            setNewColumns(tempNewCols);
+        }
+    };
+
+    const cancelAddColumn = (id: string) => {
+        const tempNewCols = {...newColumns};
+        delete tempNewCols[id];
+        setNewColumns(tempNewCols);
+    };
+
 
     return (
         <Card className="h-full">
@@ -206,6 +240,31 @@ function SchemaViewer({
                                                 />
                                             </div>
                                         ))}
+                                         {Object.entries(newColumns).filter(([id]) => id.includes(`-${table.name}-`)).map(([id, col]) => (
+                                            <div key={id} className="flex justify-between items-center text-xs group gap-2 p-2 bg-muted/50 rounded-md">
+                                                <div className="flex items-center gap-2 flex-1">
+                                                   <Input 
+                                                      placeholder="nombre_columna"
+                                                      className="h-7 text-xs border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent"
+                                                      value={col.name}
+                                                      onChange={(e) => handleNewColumnChange(id, 'name', e.target.value)}
+                                                      onClick={(e) => e.stopPropagation()}
+                                                   />
+                                                </div>
+                                                <Input 
+                                                    placeholder="tipo_dato"
+                                                    className="h-7 text-xs border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent font-mono text-sky-400 w-24"
+                                                     value={col.type}
+                                                      onChange={(e) => handleNewColumnChange(id, 'type', e.target.value)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
+                                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => confirmAddColumn(id, table.name)}><CheckCircle className="h-4 w-4 text-green-500"/></Button>
+                                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => cancelAddColumn(id)}><XCircle className="h-4 w-4 text-red-500"/></Button>
+                                            </div>
+                                        ))}
+                                        <Button variant="ghost" size="sm" className="w-full mt-2 text-xs" onClick={() => handleAddNewColumn(table.name)}>
+                                            <PlusCircle className="mr-2 h-3 w-3" /> Añadir Columna
+                                        </Button>
                                     </div>
                                 </AccordionContent>
                             </AccordionItem>
@@ -486,7 +545,11 @@ export default function RefactorPage() {
                             <div key={index} className="flex items-center justify-between bg-muted/50 p-2 rounded-md">
                                 <div className="text-xs">
                                     <Badge variant="outline" className="mr-2">{op.scope}</Badge>
-                                    <span className="font-mono">{op.scope === 'table' ? `${op.tableFrom} -> ${op.tableTo}` : `${op.tableFrom}.${op.columnFrom} -> ${op.columnTo || op.columnFrom}${op.type ? ` (${op.type})` : ''}`}</span>
+                                    <span className="font-mono">{
+                                        op.scope === 'table' ? `${op.tableFrom} -> ${op.tableTo}` : 
+                                        op.scope === 'add-column' ? `ADD ${op.columnTo}(${op.type}) TO ${op.tableFrom}` :
+                                        `${op.tableFrom}.${op.columnFrom} -> ${op.columnTo || op.columnFrom}${op.type ? ` (${op.type})` : ''}`
+                                    }</span>
                                 </div>
                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeRename(index)}>
                                     <XCircle className="h-4 w-4 text-muted-foreground" />
@@ -524,4 +587,3 @@ export default function RefactorPage() {
     </div>
   );
 }
-

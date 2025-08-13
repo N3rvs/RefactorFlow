@@ -1,6 +1,6 @@
 
 export interface RenameOperation {
-  scope: "column" | "table";
+  scope: "column" | "table" | "add-column";
   tableFrom: string;
   tableTo?: string;
   columnFrom?: string;
