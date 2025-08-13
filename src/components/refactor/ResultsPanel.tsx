@@ -1,6 +1,7 @@
 
 "use client";
 
+import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,8 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertTriangle, CheckCircle, FileText, Bot, Terminal, DatabaseZap, Info, ChevronRight, Eye } from "lucide-react";
-import type { RefactorResponse } from "@/lib/types";
+import type { RefactorResponse, CodefixFile } from "@/lib/types";
 import { CodeBlock } from "./CodeBlock";
+import { CodeDiffViewer } from "./CodeDiffViewer";
 
 interface ResultsPanelProps {
   result: RefactorResponse | null;
@@ -29,6 +31,8 @@ const LoadingSkeleton = () => (
 );
 
 export default function ResultsPanel({ result, loading, error }: ResultsPanelProps) {
+  const [selectedFile, setSelectedFile] = useState<CodefixFile | null>(null);
+
   const renderContent = () => {
     if (loading) {
       return <LoadingSkeleton />;
@@ -55,8 +59,10 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
     }
 
     const { sql, codefix, dbLog, log } = result;
+    const changedFile = codefix?.files.find(f => f.changed);
 
     return (
+      <>
       <Tabs defaultValue="summary" className="w-full">
         <div className="px-6 pt-0">
           <TabsList className="grid w-full grid-cols-4 bg-muted/50">
@@ -86,18 +92,22 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">File</span>
-                        <span className="font-mono">{codefix.files.find(f => f.changed)?.path.split('/').pop() || 'N/A'}</span>
+                        <span className="font-mono">{changedFile?.path.split('/').pop() || 'N/A'}</span>
                       </div>
                        <div className="flex justify-between">
                         <span className="text-muted-foreground">Changed</span>
-                        <Badge variant="outline" className="text-green-400 border-green-500/30 bg-green-500/10">
-                          <CheckCircle className="h-3 w-3 mr-1"/>
-                          <span>Sí</span>
+                        <Badge variant="outline" className={changedFile ? "text-green-400 border-green-500/30 bg-green-500/10" : ""}>
+                          {changedFile ? <CheckCircle className="h-3 w-3 mr-1"/> : null}
+                          <span>{changedFile ? 'Sí' : 'No'}</span>
                         </Badge>
                       </div>
                        <div className="flex justify-between">
                         <span className="text-muted-foreground">Preview</span>
-                         <button className="text-muted-foreground hover:text-foreground text-xs flex items-center gap-1">
+                         <button 
+                            className="text-muted-foreground hover:text-foreground text-xs flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={!changedFile}
+                            onClick={() => changedFile && setSelectedFile(changedFile)}
+                         >
                            <Eye className="h-3 w-3"/> Ver
                          </button>
                       </div>
@@ -144,6 +154,7 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
                                   <TableRow>
                                       <TableHead>Archivo</TableHead>
                                       <TableHead className="w-24 text-center">Cambiado</TableHead>
+                                      <TableHead className="w-24 text-center">Preview</TableHead>
                                   </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -155,10 +166,20 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
                                                   <CheckCircle className="h-5 w-5 text-green-500 inline-block"/> : 
                                                   <span className="text-muted-foreground">-</span>}
                                           </TableCell>
+                                           <TableCell className="text-center">
+                                              <Button 
+                                                variant="ghost" 
+                                                size="sm" 
+                                                disabled={!file.changed}
+                                                onClick={() => setSelectedFile(file)}
+                                              >
+                                                <Eye className="h-4 w-4" />
+                                              </Button>
+                                          </TableCell>
                                       </TableRow>
                                   )) : (
                                       <TableRow>
-                                          <TableCell colSpan={2} className="text-center text-muted-foreground py-8">No se afectaron archivos.</TableCell>
+                                          <TableCell colSpan={3} className="text-center text-muted-foreground py-8">No se afectaron archivos.</TableCell>
                                       </TableRow>
                                   )}
                               </TableBody>
@@ -185,6 +206,13 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
             </div>
         </TabsContent>
       </Tabs>
+      {selectedFile && (
+        <CodeDiffViewer 
+          file={selectedFile}
+          onClose={() => setSelectedFile(null)}
+        />
+      )}
+      </>
     );
   };
 
@@ -199,5 +227,3 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
     </Card>
   );
 }
-
-    

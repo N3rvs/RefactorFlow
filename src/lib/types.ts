@@ -1,3 +1,4 @@
+
 export interface RenameOperation {
   scope: "column" | "table";
   tableFrom: string;
@@ -67,6 +68,8 @@ export interface CodefixFile {
   path: string;
   changed: boolean;
   changes?: number; // From API docs
+  originalContent?: string;
+  modifiedContent?: string;
 }
 
 export interface CodefixResult {
