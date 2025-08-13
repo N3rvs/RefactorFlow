@@ -7,7 +7,7 @@ import { runRefactor, runCleanup, analyzeSchema, generatePlan, runCodeFix } from
 import { useToast } from "@/hooks/use-toast";
 
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger } from "@/components/ui/sidebar";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -40,7 +40,9 @@ import {
   FileCode,
   Box,
   SlidersHorizontal,
-  Pencil
+  Pencil,
+  Sparkles,
+  Play
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import ResultsPanel from "@/components/refactor/ResultsPanel";
@@ -62,13 +64,22 @@ function SchemaViewer({
     const hasSchema = schema && schema.tables && schema.tables.length > 0;
 
     const handleTableNameChange = (originalName: string, newName: string) => {
-        const existingRename = plan.renames.find(r => r.scope === 'table' && r.tableFrom === originalName);
-        if (existingRename) {
-            const updatedRenames = plan.renames.map(r => 
-                r.scope === 'table' && r.tableFrom === originalName ? { ...r, tableTo: newName } : r
-            );
-            onPlanChange({ ...plan, renames: updatedRenames.filter(r => r.tableTo !== originalName) });
-        } else if (newName && newName !== originalName) {
+        // Remove existing rename for this table if new name is same as original
+        if (newName === originalName) {
+            const updatedRenames = plan.renames.filter(r => !(r.scope === 'table' && r.tableFrom === originalName));
+            onPlanChange({ ...plan, renames: updatedRenames });
+            return;
+        }
+
+        const existingRenameIndex = plan.renames.findIndex(r => r.scope === 'table' && r.tableFrom === originalName);
+
+        if (existingRenameIndex > -1) {
+            // Update existing table rename
+            const updatedRenames = [...plan.renames];
+            updatedRenames[existingRenameIndex] = { ...updatedRenames[existingRenameIndex], tableTo: newName };
+            onPlanChange({ ...plan, renames: updatedRenames });
+        } else if (newName) {
+            // Add new table rename
             const newRename: RenameOperation = {
                 scope: 'table',
                 tableFrom: originalName,
@@ -79,16 +90,22 @@ function SchemaViewer({
     };
     
     const handleColumnNameChange = (tableName: string, originalName: string, newName: string) => {
-        const existingRename = plan.renames.find(r => r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === originalName);
+        // Remove existing rename for this column if new name is same as original
+        if (newName === originalName) {
+            const updatedRenames = plan.renames.filter(r => !(r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === originalName));
+            onPlanChange({ ...plan, renames: updatedRenames });
+            return;
+        }
+        
+        const existingRenameIndex = plan.renames.findIndex(r => r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === originalName);
 
-        if (existingRename) {
-            const updatedRenames = plan.renames.map(r => 
-                (r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === originalName) 
-                ? { ...r, columnTo: newName } 
-                : r
-            );
-             onPlanChange({ ...plan, renames: updatedRenames.filter(r => r.columnTo !== originalName) });
-        } else if (newName && newName !== originalName) {
+        if (existingRenameIndex > -1) {
+            // Update existing column rename
+             const updatedRenames = [...plan.renames];
+             updatedRenames[existingRenameIndex] = { ...updatedRenames[existingRenameIndex], columnTo: newName };
+             onPlanChange({ ...plan, renames: updatedRenames });
+        } else if (newName) {
+            // Add new column rename
             const newRename: RenameOperation = {
                 scope: 'column',
                 tableFrom: tableName,
@@ -125,7 +142,7 @@ function SchemaViewer({
                     </div>
                 )}
                 {hasSchema && !loading && (
-                    <Accordion type="multiple" className="w-full max-h-[calc(100vh-12rem)] overflow-y-auto pr-2">
+                    <Accordion type="multiple" className="w-full max-h-[calc(100vh-20rem)] overflow-y-auto pr-2">
                         {schema.tables.map((table) => (
                             <AccordionItem value={table.name} key={table.name}>
                                 <AccordionTrigger>
@@ -135,6 +152,7 @@ function SchemaViewer({
                                         defaultValue={table.name}
                                         className="h-8 border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent"
                                         onBlur={(e) => handleTableNameChange(table.name, e.target.value)}
+                                        onClick={(e) => e.stopPropagation()}
                                      />
                                   </div>
                                 </AccordionTrigger>
@@ -148,6 +166,7 @@ function SchemaViewer({
                                                       defaultValue={col.name}
                                                       className="h-7 text-xs border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent"
                                                       onBlur={(e) => handleColumnNameChange(table.name, col.name, e.target.value)}
+                                                      onClick={(e) => e.stopPropagation()}
                                                    />
                                                 </div>
                                                 <Badge variant="outline" className="font-mono text-sky-400 border-sky-400/30">{col.sqlType}</Badge>
@@ -277,11 +296,11 @@ export default function RefactorPage() {
   };
   
   useEffect(() => {
-    if (result) {
+    if (result && result.error) {
         toast({
-            title: `Operación ${result.ok ? "exitosa" : "fallida"}`,
-            description: result.error ? getErrorMessage(result.error) : (result.dbLog || result.log || "La operación se completó."),
-            variant: result.ok ? "default" : "destructive",
+            title: `Operación fallida`,
+            description: getErrorMessage(result.error),
+            variant: "destructive",
             duration: 5000
         })
     }
@@ -373,29 +392,6 @@ export default function RefactorPage() {
                 </Card>
                  <Card>
                     <CardHeader>
-                      <CardTitle className="text-base font-medium">Acciones</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                       <Button variant="outline" className="w-full justify-start" onClick={() => handleRefactor(false)} disabled={loading === 'preview'}>
-                          {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
-                          Preview
-                      </Button>
-                       <Button variant="outline" className="w-full justify-start" onClick={handlePlan} disabled={loading === 'plan'}>
-                          {loading === 'plan' ? <Loader2 className="animate-spin" /> : <FileText/>}
-                          Generate SQL
-                      </Button>
-                      <Button variant="destructive" className="w-full" onClick={() => handleRefactor(true)} disabled={loading === 'apply' || !result || result.apply === true}>
-                            {loading === 'apply' ? <Loader2 className="animate-spin" /> : null}
-                            Aplicar
-                      </Button>
-                       <Button variant="secondary" className="w-full" onClick={handleCleanup} disabled={loading === 'cleanup'}>
-                           {loading === 'cleanup' ? <Loader2 className="animate-spin" /> : null}
-                           Cleanup
-                        </Button>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
                       <CardTitle className="text-base font-medium">Opciones</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -420,6 +416,18 @@ export default function RefactorPage() {
                         <p className="text-xs text-muted-foreground pt-2">Las vistas de solo lectura y los sinónimos permiten que el código cliente heredado funcione sin cambios inmediatos.</p>
                     </CardContent>
                 </Card>
+                <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base font-medium">Limpieza</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                       <p className="text-xs text-muted-foreground pb-2">Una vez aplicados los cambios y actualizado el código, puedes eliminar los elementos de compatibilidad (vistas/sinónimos).</p>
+                       <Button variant="secondary" className="w-full" onClick={handleCleanup} disabled={loading === 'cleanup'}>
+                           {loading === 'cleanup' ? <Loader2 className="animate-spin" /> : <Trash2 />}
+                           Cleanup
+                        </Button>
+                    </CardContent>
+                </Card>
 
               </div>
 
@@ -439,7 +447,7 @@ export default function RefactorPage() {
                       {plan.renames.length === 0 ? (
                         <p className="text-sm text-muted-foreground text-center py-4">Aún no hay cambios en el plan.</p>
                       ) : (
-                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                        <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
                           {plan.renames.map((op, index) => (
                             <div key={index} className="flex items-center justify-between bg-muted/50 p-2 rounded-md">
                                 <div className="text-xs">
@@ -454,7 +462,27 @@ export default function RefactorPage() {
                         </div>
                       )}
                     </CardContent>
+                    <CardFooter className="flex flex-wrap gap-2 pt-4 border-t">
+                      <Button variant="outline" size="sm" onClick={() => handleRefactor(false)} disabled={loading === 'preview' || plan.renames.length === 0}>
+                          {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
+                          DB Preview
+                      </Button>
+                       <Button variant="outline" size="sm" onClick={handlePlan} disabled={loading === 'plan' || plan.renames.length === 0}>
+                          {loading === 'plan' ? <Loader2 className="animate-spin" /> : <FileText/>}
+                          Generate SQL
+                      </Button>
+                       <Button variant="outline" size="sm" onClick={() => handleCodefix(false)} disabled={loading === 'codefix' || plan.renames.length === 0}>
+                          {loading === 'codefix' ? <Loader2 className="animate-spin" /> : <FileCode/>}
+                          CodeFix Preview
+                      </Button>
+                      <div className="flex-grow"></div>
+                      <Button variant="destructive" size="sm" onClick={() => handleRefactor(true)} disabled={loading === 'apply' || plan.renames.length === 0}>
+                            {loading === 'apply' ? <Loader2 className="animate-spin" /> : <Play />}
+                            Aplicar Cambios
+                      </Button>
+                    </CardFooter>
                 </Card>
+                <ResultsPanel result={result} loading={!!loading} error={result?.error || null} />
               </div>
             </div>
         </main>
