@@ -3,9 +3,9 @@ import type {
   RefactorResponse,
   CleanupRequest,
   SchemaResponse,
-  PlanRequest,      // { renames: RenameOperation[], useSynonyms?: boolean, useViews?: boolean, cqrs?: boolean }
-  PlanResponse,     // { sql: { renameSql?: string; compatSql?: string; cleanupSql?: string }, report?: {...} }
-  CodeFixRequest,   // { rootKey: string; plan: { renames: [...] }; apply: boolean; includeGlobs?: string[]; excludeGlobs?: string[] }
+  PlanRequest,
+  PlanResponse,
+  CodeFixRequest,
   CodefixResult,
 } from "./types";
 
@@ -35,8 +35,6 @@ async function fetchApi<T>(
   };
 
   try {
-    // Útil para depurar URL reales:
-    // console.debug("[DBRefactor] ->", finalUrl, options);
     const res = await fetch(finalUrl, {
       cache: "no-store",
       // @ts-ignore Next.js
@@ -78,11 +76,12 @@ export async function analyzeSchema(connectionString: string): Promise<SchemaRes
 
 /** POST /plan    (NO requiere connectionString) */
 export async function generatePlan(data: PlanRequest): Promise<PlanResponse> {
-  // data = { renames, useSynonyms?, useViews?, cqrs? }
-  return fetchApi<PlanResponse>("/plan", {
+  const raw = await fetchApi<any>("/plan", {
     method: "POST",
     body: JSON.stringify(data),
   });
+  const sql = raw?.sql ?? raw?.bundle ?? null;
+  return { sql, report: raw?.report ?? null };
 }
 
 /** POST /refactor/run  (sí requiere connectionString) */

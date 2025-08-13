@@ -1,8 +1,8 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
-import type { RefactorPlan, RefactorResponse, CleanupRequest, RefactorRequest, SchemaResponse, RenameOperation } from "@/lib/types";
+import { useState, useEffect, useRef } from "react";
+import type { RefactorPlan, RefactorResponse, CleanupRequest, RefactorRequest, SchemaResponse, RenameOperation, PlanRequest } from "@/lib/types";
 import { runRefactor, runCleanup, analyzeSchema, generatePlan, runCodeFix } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
@@ -15,8 +15,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Table as UiTable, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+
 import {
   Wand2,
   History,
@@ -66,9 +67,7 @@ function SchemaViewer({
     const hasSchema = schema && schema.tables && schema.tables.length > 0;
     const [newColumns, setNewColumns] = useState<Record<string, { name: string; type: string }>>({});
 
-
     const handleTableNameChange = (originalName: string, newName: string) => {
-        // Remove existing rename for this table if new name is same as original
         if (newName === originalName) {
             const updatedRenames = plan.renames.filter(r => !(r.scope === 'table' && r.tableFrom === originalName));
             onPlanChange({ ...plan, renames: updatedRenames });
@@ -78,12 +77,10 @@ function SchemaViewer({
         const existingRenameIndex = plan.renames.findIndex(r => r.scope === 'table' && r.tableFrom === originalName);
 
         if (existingRenameIndex > -1) {
-            // Update existing table rename
             const updatedRenames = [...plan.renames];
             updatedRenames[existingRenameIndex] = { ...updatedRenames[existingRenameIndex], tableTo: newName };
             onPlanChange({ ...plan, renames: updatedRenames });
         } else if (newName) {
-            // Add new table rename
             const newRename: RenameOperation = {
                 scope: 'table',
                 tableFrom: originalName,
@@ -94,7 +91,6 @@ function SchemaViewer({
     };
     
     const handleColumnNameChange = (tableName: string, originalName: string, newName: string) => {
-        // Remove existing rename for this column if new name is same as original
         if (newName === originalName) {
             const updatedRenames = plan.renames.filter(r => !(r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === originalName));
             onPlanChange({ ...plan, renames: updatedRenames });
@@ -104,12 +100,10 @@ function SchemaViewer({
         const existingRenameIndex = plan.renames.findIndex(r => r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === originalName);
 
         if (existingRenameIndex > -1) {
-            // Update existing column rename
              const updatedRenames = [...plan.renames];
              updatedRenames[existingRenameIndex] = { ...updatedRenames[existingRenameIndex], columnTo: newName };
              onPlanChange({ ...plan, renames: updatedRenames });
         } else if (newName) {
-            // Add new column rename
             const newRename: RenameOperation = {
                 scope: 'column',
                 tableFrom: tableName,
@@ -127,7 +121,6 @@ function SchemaViewer({
         const existingRenameIndex = updatedRenames.findIndex(r => r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === columnName);
 
         if (existingRenameIndex > -1) {
-            // If it exists, update it.
             const existing = updatedRenames[existingRenameIndex];
             if (isChangingType) {
                  updatedRenames[existingRenameIndex] = { ...existing, type: newType };
@@ -136,11 +129,11 @@ function SchemaViewer({
                  updatedRenames[existingRenameIndex] = rest;
             }
         } else if (isChangingType) {
-            // If it doesn't exist, create it.
             const newRename: RenameOperation = {
                 scope: 'column',
                 tableFrom: tableName,
                 columnFrom: columnName,
+                columnTo: columnName,
                 type: newType,
             };
             updatedRenames.push(newRename);
@@ -181,17 +174,16 @@ function SchemaViewer({
         setNewColumns(tempNewCols);
     };
 
-
     return (
         <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <div className="flex items-center gap-2">
                     <Database className="h-4 w-4" />
-                    <CardTitle className="text-base font-medium">Esquema de Base de Datos</CardTitle>
+                    <CardTitle className="text-base font-medium">Database Schema</CardTitle>
                 </div>
                 <Button variant="ghost" size="sm" onClick={onRefresh} disabled={loading} className="text-xs">
                     {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-2 h-3 w-3" />}
-                    Refrescar
+                    Refresh
                 </Button>
             </CardHeader>
             <CardContent>
@@ -205,8 +197,8 @@ function SchemaViewer({
                  {!loading && !hasSchema && (
                     <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-96">
                         <Database className="h-16 w-16 mb-4" />
-                        <h3 className="text-lg font-medium">Conecta tu base de datos</h3>
-                        <p className="text-sm">Presiona "Check Connection" para cargar y visualizar el esquema.</p>
+                        <h3 className="text-lg font-medium">Connect your database</h3>
+                        <p className="text-sm">Press "Check Connection" to load and visualize the schema.</p>
                     </div>
                 )}
                 {hasSchema && !loading && (
@@ -249,7 +241,7 @@ function SchemaViewer({
                                             <div key={id} className="flex justify-between items-center text-xs group gap-2 p-2 bg-muted/50 rounded-md">
                                                 <div className="flex items-center gap-2 flex-1">
                                                    <Input 
-                                                      placeholder="nombre_columna"
+                                                      placeholder="column_name"
                                                       className="h-7 text-xs border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent"
                                                       value={col.name}
                                                       onChange={(e) => handleNewColumnChange(id, 'name', e.target.value)}
@@ -257,7 +249,7 @@ function SchemaViewer({
                                                    />
                                                 </div>
                                                 <Input 
-                                                    placeholder="tipo_dato"
+                                                    placeholder="data_type"
                                                     className="h-7 text-xs border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent font-mono text-sky-400 w-24"
                                                      value={col.type}
                                                       onChange={(e) => handleNewColumnChange(id, 'type', e.target.value)}
@@ -268,7 +260,7 @@ function SchemaViewer({
                                             </div>
                                         ))}
                                         <Button variant="ghost" size="sm" className="w-full mt-2 text-xs" onClick={() => handleAddNewColumn(table.name)}>
-                                            <PlusCircle className="mr-2 h-3 w-3" /> Añadir Columna
+                                            <PlusCircle className="mr-2 h-3 w-3" /> Add Column
                                         </Button>
                                     </div>
                                 </AccordionContent>
@@ -285,7 +277,7 @@ const initialPlan: RefactorPlan = {
   renames: [],
 };
 
-const initialNewRename: RenameOperation = {
+const initialNewRename: Partial<RenameOperation> = {
   scope: "table",
   tableFrom: "",
   tableTo: "",
@@ -295,17 +287,21 @@ const initialNewRename: RenameOperation = {
 export default function RefactorPage() {
   const [connectionString, setConnectionString] = useState("Server=NERVELESS;Database=StoreGuille;Trusted_Connection=True;Encrypt=True;TrustServerCertificate=True;");
   const [plan, setPlan] = useState<RefactorPlan>(initialPlan);
-  const [newRename, setNewRename] = useState<RenameOperation>(initialNewRename);
-  const [options, setOptions] = useState({ useSynonyms: true, useViews: true, cqrs: true });
+  const [newRename, setNewRename] = useState<Partial<RenameOperation>>(initialNewRename);
+  const [options, setOptions] = useState({ useSynonyms: true, useViews: true, cqrs: true, allowDestructive: false });
   const [rootKey, setRootKey] = useState("SOLUTION");
   
   const [loading, setLoading] = useState<"preview" | "apply" | "cleanup" | "analyze" | "plan" | "codefix" | false>(false);
   const [result, setResult] = useState<RefactorResponse | null>(null);
   const [schema, setSchema] = useState<SchemaResponse | null>(null);
   const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
+  
+  const [isCleanupAlertOpen, setCleanupAlertOpen] = useState(false);
+  const [cleanupConfirmation, setCleanupConfirmation] = useState("");
+  const cleanupButtonRef = useRef<HTMLButtonElement>(null);
 
-  const [activePlanTab, setActivePlanTab] = useState<'table' | 'column' | 'add-column'>('table');
-  // State for manual add column form
+
+  const [activePlanTab, setActivePlanTab] = useState<'table' | 'column' | 'add-column' | 'drop-table' | 'drop-column'>('table');
   const [newColTable, setNewColTable] = useState("");
   const [newColName, setNewColName] = useState("");
   const [baseType, setBaseType] = useState<'int' | 'nvarchar' | 'decimal' | 'bit' | 'date' | 'datetime2'>('nvarchar');
@@ -373,16 +369,29 @@ export default function RefactorPage() {
     apply ? "apply" : "preview",
     (data) => setResult(prev => ({ ...prev, ...data })),
     { 
-      loading: apply ? "Aplicando cambios..." : "Generando preview...",
-      success: apply ? "Cambios aplicados." : "Preview generada.",
-      error: apply ? "Error al aplicar cambios." : "Error al generar preview."
+      loading: apply ? "Applying changes..." : "Generating preview...",
+      success: apply ? "Changes applied." : "Preview generated.",
+      error: apply ? "Error applying changes." : "Error generating preview."
     }
   );
 
+  const triggerCleanup = () => {
+    const hasDestructiveOps = plan.renames.some(op => op.scope.startsWith('drop'));
+    if (hasDestructiveOps) {
+      setCleanupAlertOpen(true);
+    } else {
+      handleCleanup();
+    }
+  };
+  
   const handleCleanup = () => handleApiCall(
     () => runCleanup({ connectionString, renames: plan.renames, ...options }),
     "cleanup",
-    (data) => setResult(data),
+    (data) => {
+        setResult(data);
+        setCleanupAlertOpen(false);
+        setCleanupConfirmation("");
+    },
     { loading: "Running cleanup...", success: "Cleanup successful.", error: "Cleanup failed." }
   );
   
@@ -406,34 +415,52 @@ export default function RefactorPage() {
   const handleAddManualRename = () => {
     let newOp: RenameOperation | null = null;
   
-    if (activePlanTab === 'table') {
-      if (!newRename.tableFrom || !newRename.tableTo) {
-        toast({ variant: "destructive", title: "Table From and Table To are required" });
-        return;
-      }
-      newOp = { ...newRename, scope: 'table' };
-    } else if (activePlanTab === 'column') {
-       if (!newRename.tableFrom || !newRename.columnFrom || !newRename.columnTo) {
-        toast({ variant: "destructive", title: "Table From, Column From, and Column To are required" });
-        return;
-      }
-      newOp = { ...newRename, scope: 'column' };
-    } else if (activePlanTab === 'add-column') {
-      if (!newColTable.trim() || !newColName.trim()) {
-        toast({ variant: "destructive", title: "Table and Column Name are required." });
-        return;
-      }
-      newOp = {
-        scope: 'add-column',
-        tableFrom: newColTable.trim(),
-        columnTo: newColName.trim(),
-        type: buildSqlType(),
-      };
+    switch(activePlanTab) {
+        case 'table':
+             if (!newRename.tableFrom || !newRename.tableTo) {
+                toast({ variant: "destructive", title: "Table From and Table To are required" });
+                return;
+              }
+              newOp = { ...newRename, scope: 'table' } as RenameOperation;
+              break;
+        case 'column':
+             if (!newRename.tableFrom || !newRename.columnFrom || !newRename.columnTo) {
+                toast({ variant: "destructive", title: "Table From, Column From, and Column To are required" });
+                return;
+              }
+              newOp = { ...newRename, scope: 'column' } as RenameOperation;
+              break;
+        case 'add-column':
+             if (!newColTable.trim() || !newColName.trim()) {
+                toast({ variant: "destructive", title: "Table and Column Name are required." });
+                return;
+              }
+              newOp = {
+                scope: 'add-column',
+                tableFrom: newColTable.trim(),
+                columnTo: newColName.trim(),
+                type: buildSqlType(),
+              };
+              break;
+        case 'drop-table':
+            if (!newRename.tableFrom) {
+                toast({ variant: "destructive", title: "Table From is required" });
+                return;
+            }
+            newOp = { scope: 'drop-table', tableFrom: newRename.tableFrom };
+            break;
+        case 'drop-column':
+             if (!newRename.tableFrom || !newRename.columnFrom) {
+                toast({ variant: "destructive", title: "Table From and Column From are required" });
+                return;
+            }
+            newOp = { scope: 'drop-column', tableFrom: newRename.tableFrom, columnFrom: newRename.columnFrom };
+            break;
     }
   
     if (newOp) {
       setPlan(prev => ({ ...prev, renames: [...prev.renames, newOp as RenameOperation] }));
-      setNewRename(initialNewRename);
+      setNewRename({ scope: activePlanTab });
       setNewColTable("");
       setNewColName("");
     }
@@ -446,7 +473,7 @@ export default function RefactorPage() {
   useEffect(() => {
     if (result && result.error) {
         toast({
-            title: `Operación fallida`,
+            title: `Operation failed`,
             description: getErrorMessage(result.error),
             variant: "destructive",
             duration: 5000
@@ -471,19 +498,19 @@ export default function RefactorPage() {
                   <SidebarMenuItem>
                       <SidebarMenuButton>
                           <History />
-                          Historial
+                          History
                       </SidebarMenuButton>
                   </SidebarMenuItem>
                    <SidebarMenuItem>
                       <SidebarMenuButton>
                           <Box />
-                          Esquema
+                          Schema
                       </SidebarMenuButton>
                   </SidebarMenuItem>
                    <SidebarMenuItem>
                       <SidebarMenuButton>
                           <SlidersHorizontal />
-                          Ajustes
+                          Settings
                       </SidebarMenuButton>
                   </SidebarMenuItem>
               </SidebarMenu>
@@ -501,7 +528,7 @@ export default function RefactorPage() {
          <header className="sticky top-0 z-10 w-full border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="container flex h-14 max-w-screen-2xl items-center">
                 <div className="mr-4 hidden md:flex">
-                  <h1 className="text-xl font-medium">Refactar BD + Codigo</h1>
+                  <h1 className="text-xl font-medium">Refactor DB + Code</h1>
                 </div>
                 <SidebarTrigger className="md:hidden" />
                 <div className="flex flex-1 items-center justify-end space-x-4">
@@ -540,7 +567,7 @@ export default function RefactorPage() {
                 </Card>
                  <Card>
                     <CardHeader>
-                      <CardTitle className="text-base font-medium">Opciones</CardTitle>
+                      <CardTitle className="text-base font-medium">Options</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex items-center justify-between">
@@ -561,18 +588,25 @@ export default function RefactorPage() {
                              </Label>
                              <Switch id="cqrs" checked={options.cqrs} onCheckedChange={(checked) => setOptions(prev => ({...prev, cqrs: checked}))} />
                         </div>
-                        <p className="text-xs text-muted-foreground pt-2">Las vistas de solo lectura y los sinónimos permiten que el código cliente heredado funcione sin cambios inmediatos.</p>
+                         <div className="flex items-center justify-between pt-2 border-t border-destructive/20">
+                             <Label htmlFor="allowDestructive" className="text-sm font-light flex items-center gap-2 text-destructive">
+                                <AlertTriangle className="h-4 w-4" />
+                                Allow Destructive
+                            </Label>
+                             <Switch id="allowDestructive" checked={options.allowDestructive} onCheckedChange={(checked) => setOptions(prev => ({...prev, allowDestructive: checked}))} />
+                        </div>
+                        <p className="text-xs text-muted-foreground pt-2">Read-only views and synonyms allow legacy client code to work without immediate changes.</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader>
-                      <CardTitle className="text-base font-medium">Limpieza</CardTitle>
+                      <CardTitle className="text-base font-medium">Cleanup</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                       <p className="text-xs text-muted-foreground pb-2">Una vez aplicados los cambios y actualizado el código, puedes eliminar los elementos de compatibilidad (vistas/sinónimos).</p>
-                       <Button variant="secondary" className="w-full" onClick={handleCleanup} disabled={loading === 'cleanup'}>
+                       <p className="text-xs text-muted-foreground pb-2">Once changes are applied and code is updated, you can remove compatibility elements (views/synonyms).</p>
+                       <Button ref={cleanupButtonRef} variant="secondary" className="w-full" onClick={triggerCleanup} disabled={loading === 'cleanup'}>
                            {loading === 'cleanup' ? <Loader2 className="animate-spin" /> : <Trash2 />}
-                           Cleanup
+                           Run Cleanup
                         </Button>
                     </CardContent>
                 </Card>
@@ -589,28 +623,30 @@ export default function RefactorPage() {
                    />
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-base font-medium">Plan de Refactorización</CardTitle>
+                      <CardTitle className="text-base font-medium">Refactor Plan</CardTitle>
                     </CardHeader>
                      <CardContent className="space-y-4">
                         <Accordion type="single" collapsible>
                             <AccordionItem value="manual-add">
-                                <AccordionTrigger className="text-sm">Añadir operación manual</AccordionTrigger>
+                                <AccordionTrigger className="text-sm">Add manual operation</AccordionTrigger>
                                 <AccordionContent className="space-y-3 pt-4">
-                                     <div className="flex space-x-1 rounded-md bg-muted p-1">
-                                        <button onClick={() => setActivePlanTab("table")} className={cn(buttonVariants({ variant: activePlanTab === 'table' ? 'primary': 'ghost', size: 'sm' }), 'flex-1')}>Tabla</button>
-                                        <button onClick={() => setActivePlanTab("column")} className={cn(buttonVariants({ variant: activePlanTab === 'column' ? 'primary': 'ghost', size: 'sm' }), 'flex-1')}>Columna</button>
-                                        <button onClick={() => setActivePlanTab("add-column")} className={cn(buttonVariants({ variant: activePlanTab === 'add-column' ? 'primary': 'ghost', size: 'sm' }), 'flex-1')}>Añadir Columna</button>
+                                     <div className="flex space-x-1 rounded-md bg-muted p-1 flex-wrap">
+                                        <button onClick={() => setActivePlanTab("table")} className={cn(buttonVariants({ variant: activePlanTab === 'table' ? 'primary': 'ghost', size: 'sm' }), 'flex-1')}>Rename Table</button>
+                                        <button onClick={() => setActivePlanTab("column")} className={cn(buttonVariants({ variant: activePlanTab === 'column' ? 'primary': 'ghost', size: 'sm' }), 'flex-1')}>Rename Column</button>
+                                        <button onClick={() => setActivePlanTab("add-column")} className={cn(buttonVariants({ variant: activePlanTab === 'add-column' ? 'primary': 'ghost', size: 'sm' }), 'flex-1')}>Add Column</button>
+                                        <button onClick={() => setActivePlanTab("drop-table")} className={cn(buttonVariants({ variant: activePlanTab === 'drop-table' ? 'destructive': 'ghost', size: 'sm' }), 'flex-1')}>Drop Table</button>
+                                        <button onClick={() => setActivePlanTab("drop-column")} className={cn(buttonVariants({ variant: activePlanTab === 'drop-column' ? 'destructive': 'ghost', size: 'sm' }), 'flex-1')}>Drop Column</button>
                                      </div>
                                      <div className="pt-2">
                                         {activePlanTab === 'table' && (
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div>
                                                     <Label className="text-xs">Table From</Label>
-                                                    <Input value={newRename.tableFrom} onChange={(e) => setNewRename(prev => ({ ...prev, tableFrom: e.target.value, scope: 'table' }))} className="h-9 text-sm" />
+                                                    <Input value={newRename.tableFrom || ''} onChange={(e) => setNewRename(prev => ({ ...prev, tableFrom: e.target.value, scope: 'table' }))} className="h-9 text-sm" />
                                                 </div>
                                                 <div>
                                                     <Label className="text-xs">Table To</Label>
-                                                    <Input value={newRename.tableTo} onChange={(e) => setNewRename(prev => ({ ...prev, tableTo: e.target.value, scope: 'table' }))} className="h-9 text-sm" />
+                                                    <Input value={newRename.tableTo || ''} onChange={(e) => setNewRename(prev => ({ ...prev, tableTo: e.target.value, scope: 'table' }))} className="h-9 text-sm" />
                                                 </div>
                                             </div>
                                         )}
@@ -618,21 +654,21 @@ export default function RefactorPage() {
                                             <div className="space-y-3">
                                                 <div>
                                                     <Label className="text-xs">Table From</Label>
-                                                    <Input value={newRename.tableFrom} onChange={(e) => setNewRename(prev => ({ ...prev, tableFrom: e.target.value, scope: 'column' }))} className="h-9 text-sm" />
+                                                    <Input value={newRename.tableFrom || ''} onChange={(e) => setNewRename(prev => ({ ...prev, tableFrom: e.target.value, scope: 'column' }))} className="h-9 text-sm" />
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <div>
                                                         <Label className="text-xs">Column From</Label>
-                                                        <Input value={newRename.columnFrom} onChange={(e) => setNewRename(prev => ({ ...prev, columnFrom: e.target.value, scope: 'column' }))} className="h-9 text-sm" />
+                                                        <Input value={newRename.columnFrom || ''} onChange={(e) => setNewRename(prev => ({ ...prev, columnFrom: e.target.value, scope: 'column' }))} className="h-9 text-sm" />
                                                     </div>
                                                     <div>
                                                         <Label className="text-xs">Column To</Label>
-                                                        <Input value={newRename.columnTo} onChange={(e) => setNewRename(prev => ({ ...prev, columnTo: e.target.value, scope: 'column' }))} className="h-9 text-sm" />
+                                                        <Input value={newRename.columnTo || ''} onChange={(e) => setNewRename(prev => ({ ...prev, columnTo: e.target.value, scope: 'column' }))} className="h-9 text-sm" />
                                                     </div>
                                                 </div>
                                                 <div>
-                                                    <Label className="text-xs">Type (Opcional)</Label>
-                                                    <Input value={newRename.type} onChange={(e) => setNewRename(prev => ({ ...prev, type: e.target.value, scope: 'column' }))} className="h-9 text-sm" />
+                                                    <Label className="text-xs">Type (Optional)</Label>
+                                                    <Input value={newRename.type || ''} onChange={(e) => setNewRename(prev => ({ ...prev, type: e.target.value, scope: 'column' }))} className="h-9 text-sm" />
                                                 </div>
                                             </div>
                                         )}
@@ -682,8 +718,26 @@ export default function RefactorPage() {
                                                   )}
                                             </div>
                                         )}
+                                        {activePlanTab === 'drop-table' && (
+                                            <div>
+                                                <Label className="text-xs text-destructive">Table to Drop</Label>
+                                                <Input value={newRename.tableFrom || ''} onChange={(e) => setNewRename(prev => ({ ...prev, tableFrom: e.target.value, scope: 'drop-table' }))} className="h-9 text-sm border-destructive" />
+                                            </div>
+                                        )}
+                                        {activePlanTab === 'drop-column' && (
+                                             <div className="space-y-3">
+                                                <div>
+                                                    <Label className="text-xs text-destructive">Table From</Label>
+                                                    <Input value={newRename.tableFrom || ''} onChange={(e) => setNewRename(prev => ({ ...prev, tableFrom: e.target.value, scope: 'drop-column' }))} className="h-9 text-sm border-destructive" />
+                                                </div>
+                                                <div>
+                                                    <Label className="text-xs text-destructive">Column to Drop</Label>
+                                                    <Input value={newRename.columnFrom || ''} onChange={(e) => setNewRename(prev => ({ ...prev, columnFrom: e.target.value, scope: 'drop-column' }))} className="h-9 text-sm border-destructive" />
+                                                </div>
+                                            </div>
+                                        )}
                                      </div>
-                                    <Button size="sm" onClick={handleAddManualRename} className="w-full">Añadir al plan</Button>
+                                    <Button size="sm" onClick={handleAddManualRename} className="w-full">Add to plan</Button>
                                 </AccordionContent>
                             </AccordionItem>
                         </Accordion>
@@ -691,24 +745,29 @@ export default function RefactorPage() {
                         <Separator />
 
                       {plan.renames.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-4">Aún no hay cambios en el plan.</p>
+                        <p className="text-sm text-muted-foreground text-center py-4">No changes in plan yet.</p>
                       ) : (
                         <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                          {plan.renames.map((op, index) => (
-                            <div key={index} className="flex items-center justify-between bg-muted/50 p-2 rounded-md">
-                                <div className="text-xs">
-                                    <Badge variant="outline" className="mr-2">{op.scope}</Badge>
-                                    <span className="font-mono">{
-                                        op.scope === 'table' ? `${op.tableFrom} -> ${op.tableTo}` : 
-                                        op.scope === 'add-column' ? `ADD ${op.columnTo}(${op.type}) TO ${op.tableFrom}` :
-                                        `${op.tableFrom}.${op.columnFrom} -> ${op.columnTo || op.columnFrom}${op.type ? ` (${op.type})` : ''}`
-                                    }</span>
+                          {plan.renames.map((op, index) => {
+                            const isDestructive = op.scope.startsWith('drop');
+                            return (
+                                <div key={index} className={cn("flex items-center justify-between bg-muted/50 p-2 rounded-md", isDestructive && "bg-destructive/10")}>
+                                    <div className="text-xs">
+                                        <Badge variant={isDestructive ? "destructive" : "outline"} className="mr-2">{op.scope}</Badge>
+                                        <span className="font-mono">{
+                                            op.scope === 'table' ? `${op.tableFrom} -> ${op.tableTo}` : 
+                                            op.scope === 'add-column' ? `ADD ${op.columnTo}(${op.type}) TO ${op.tableFrom}` :
+                                            op.scope === 'drop-table' ? op.tableFrom :
+                                            op.scope === 'drop-column' ? `${op.tableFrom}.${op.columnFrom}` :
+                                            `${op.tableFrom}.${op.columnFrom} -> ${op.columnTo || op.columnFrom}${op.type ? ` (${op.type})` : ''}`
+                                        }</span>
+                                    </div>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeRename(index)}>
+                                        <XCircle className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
                                 </div>
-                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeRename(index)}>
-                                    <XCircle className="h-4 w-4 text-muted-foreground" />
-                                </Button>
-                            </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       )}
                     </CardContent>
@@ -728,7 +787,7 @@ export default function RefactorPage() {
                       <div className="flex-grow"></div>
                       <Button variant="destructive" size="sm" onClick={() => handleRefactor(true)} disabled={loading === 'apply' || plan.renames.length === 0}>
                             {loading === 'apply' ? <Loader2 className="animate-spin" /> : <Play />}
-                            Aplicar Cambios
+                            Apply Changes
                       </Button>
                     </CardFooter>
                 </Card>
@@ -737,6 +796,34 @@ export default function RefactorPage() {
             </div>
         </main>
       </SidebarInset>
+      
+      <AlertDialog open={isCleanupAlertOpen} onOpenChange={setCleanupAlertOpen}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Delete database objects?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      DROP TABLE / DROP COLUMN commands are about to be executed. This action is irreversible.
+                      Please type "ELIMINAR" to confirm.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <Input
+                value={cleanupConfirmation}
+                onChange={e => setCleanupConfirmation(e.target.value)}
+                placeholder='ELIMINAR'
+                className="my-4"
+              />
+              <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setCleanupConfirmation("")}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                      onClick={handleCleanup}
+                      disabled={cleanupConfirmation !== 'ELIMINAR' || loading === 'cleanup'}
+                      className={buttonVariants({ variant: "destructive" })}
+                  >
+                     {loading === 'cleanup' ? <Loader2 className="animate-spin" /> : "Yes, delete"}
+                  </AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

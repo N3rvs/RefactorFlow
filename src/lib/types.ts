@@ -1,8 +1,14 @@
 
-export type RenameOperation =
-  | { scope: "table";  tableFrom: string; tableTo: string;  columnFrom?: undefined; columnTo?: undefined; type?: undefined, area?: undefined; }
-  | { scope: "column"; tableFrom: string; columnFrom: string; columnTo?: string; type?: string; tableTo?: undefined, area?: undefined; }
-  | { scope: "add-column"; tableFrom: string; columnTo: string; type: string; columnFrom?: undefined; tableTo?: undefined, area?: undefined; };
+export type RenameOperation = {
+  scope: "table" | "column" | "add-column" | "drop-table" | "drop-column";
+  area?: "write" | "read" | "both";
+  tableFrom: string;
+  tableTo?: string | null;
+  columnFrom?: string | null;
+  columnTo?: string | null;
+  type?: string | null;
+  note?: string | null;
+};
 
 export type CleanupRequest = {
   connectionString: string;
@@ -10,6 +16,7 @@ export type CleanupRequest = {
   useSynonyms?: boolean;
   useViews?: boolean;
   cqrs?: boolean;
+  allowDestructive?: boolean;
 };
 
 export type ApplyRequest = PlanRequest;
@@ -23,15 +30,16 @@ export type PlanRequest = {
   useSynonyms?: boolean;
   useViews?: boolean;
   cqrs?: boolean;
+  allowDestructive?: boolean;
 };
 
 export interface PlanResponse {
-  sql: SqlScripts;
+  sql: SqlScripts | null;
   report: {
     tablesChanged: number;
     columnsChanged: number;
     operations: number;
-  };
+  } | null;
 }
 
 export interface RefactorRequest {
@@ -80,8 +88,8 @@ export interface RefactorResponse {
   apply?: boolean;
   dbLog?: string;
   log?: string; // for cleanup
-  sql: SqlScripts;
-  codefix: CodefixResult;
+  sql?: SqlScripts;
+  codefix?: CodefixResult;
   error?: string;
   stack?: string;
 }
@@ -104,5 +112,3 @@ export interface Table {
 export interface SchemaResponse {
     tables: Table[];
 }
-
-    
