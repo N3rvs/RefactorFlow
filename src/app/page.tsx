@@ -371,31 +371,6 @@ export default function RefactorPage() {
                         </div>
                     </CardContent>
                 </Card>
-
-                 <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base font-medium">Plan de Refactorización</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {plan.renames.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-4">Aún no hay cambios en el plan.</p>
-                      ) : (
-                        <div className="space-y-2 max-h-48 overflow-y-auto">
-                          {plan.renames.map((op, index) => (
-                            <div key={index} className="flex items-center justify-between bg-muted/50 p-2 rounded-md">
-                                <div className="text-xs">
-                                    <Badge variant="outline" className="mr-2">{op.scope}</Badge>
-                                    <span className="font-mono">{op.scope === 'table' ? `${op.tableFrom} -> ${op.tableTo}` : `${op.tableFrom}.${op.columnFrom} -> ${op.columnTo}`}</span>
-                                </div>
-                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeRename(index)}>
-                                    <XCircle className="h-4 w-4 text-muted-foreground" />
-                                </Button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                </Card>
                  <Card>
                     <CardHeader>
                       <CardTitle className="text-base font-medium">Acciones</CardTitle>
@@ -448,7 +423,7 @@ export default function RefactorPage() {
 
               </div>
 
-              <div className="col-span-3">
+              <div className="col-span-3 flex flex-col gap-6">
                   <SchemaViewer 
                     schema={schema} 
                     onRefresh={handleAnalyze} 
@@ -456,6 +431,30 @@ export default function RefactorPage() {
                     plan={plan}
                     onPlanChange={setPlan}
                    />
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base font-medium">Plan de Refactorización</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {plan.renames.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">Aún no hay cambios en el plan.</p>
+                      ) : (
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {plan.renames.map((op, index) => (
+                            <div key={index} className="flex items-center justify-between bg-muted/50 p-2 rounded-md">
+                                <div className="text-xs">
+                                    <Badge variant="outline" className="mr-2">{op.scope}</Badge>
+                                    <span className="font-mono">{op.scope === 'table' ? `${op.tableFrom} -> ${op.tableTo}` : `${op.tableFrom}.${op.columnFrom} -> ${op.columnTo}`}</span>
+                                </div>
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeRename(index)}>
+                                    <XCircle className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                </Card>
               </div>
             </div>
         </main>
