@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger } from "@/components/ui/sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,6 +48,7 @@ import {
 import { Logo } from "@/components/logo";
 import ResultsPanel from "@/components/refactor/ResultsPanel";
 import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 
 function SchemaViewer({ 
     schema, 
@@ -184,7 +185,10 @@ function SchemaViewer({
     return (
         <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-base font-medium">Esquema de Base de Datos</CardTitle>
+                <div className="flex items-center gap-2">
+                    <Database className="h-4 w-4" />
+                    <CardTitle className="text-base font-medium">Esquema de Base de Datos</CardTitle>
+                </div>
                 <Button variant="ghost" size="sm" onClick={onRefresh} disabled={loading} className="text-xs">
                     {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-2 h-3 w-3" />}
                     Refrescar
@@ -285,9 +289,6 @@ const initialNewRename: RenameOperation = {
   scope: "table",
   tableFrom: "",
   tableTo: "",
-  columnFrom: "",
-  columnTo: "",
-  type: "",
 };
 
 
@@ -302,7 +303,16 @@ export default function RefactorPage() {
   const [result, setResult] = useState<RefactorResponse | null>(null);
   const [schema, setSchema] = useState<SchemaResponse | null>(null);
   const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
-  
+
+  const [activePlanTab, setActivePlanTab] = useState<'table' | 'column' | 'add-column'>('table');
+  // State for manual add column form
+  const [newColTable, setNewColTable] = useState("");
+  const [newColName, setNewColName] = useState("");
+  const [baseType, setBaseType] = useState<'int' | 'nvarchar' | 'decimal' | 'bit' | 'date' | 'datetime2'>('nvarchar');
+  const [length, setLength] = useState<number>(50);
+  const [precision, setPrecision] = useState<number>(10);
+  const [scale, setScale] = useState<number>(2);
+
   const { toast, dismiss } = useToast();
 
   const getErrorMessage = (error: unknown): string => {
@@ -386,14 +396,47 @@ export default function RefactorPage() {
       error: "Failed to run CodeFix."
     }
   );
+
+  function buildSqlType(): string {
+    if (baseType === "nvarchar") return `nvarchar(${length || 50})`;
+    if (baseType === "decimal") return `decimal(${precision || 10}, ${scale || 2})`;
+    return baseType;
+  }
   
   const handleAddManualRename = () => {
-    if (!newRename.tableFrom) {
-      toast({ variant: "destructive", title: "Table From is required" });
-      return;
+    let newOp: RenameOperation | null = null;
+  
+    if (activePlanTab === 'table') {
+      if (!newRename.tableFrom || !newRename.tableTo) {
+        toast({ variant: "destructive", title: "Table From and Table To are required" });
+        return;
+      }
+      newOp = { ...newRename, scope: 'table' };
+    } else if (activePlanTab === 'column') {
+       if (!newRename.tableFrom || !newRename.columnFrom || !newRename.columnTo) {
+        toast({ variant: "destructive", title: "Table From, Column From, and Column To are required" });
+        return;
+      }
+      newOp = { ...newRename, scope: 'column' };
+    } else if (activePlanTab === 'add-column') {
+      if (!newColTable.trim() || !newColName.trim()) {
+        toast({ variant: "destructive", title: "Table and Column Name are required." });
+        return;
+      }
+      newOp = {
+        scope: 'add-column',
+        tableFrom: newColTable.trim(),
+        columnTo: newColName.trim(),
+        type: buildSqlType(),
+      };
     }
-    setPlan(prev => ({ ...prev, renames: [...prev.renames, newRename] }));
-    setNewRename(initialNewRename);
+  
+    if (newOp) {
+      setPlan(prev => ({ ...prev, renames: [...prev.renames, newOp as RenameOperation] }));
+      setNewRename(initialNewRename);
+      setNewColTable("");
+      setNewColName("");
+    }
   };
   
   const removeRename = (index: number) => {
@@ -553,48 +596,93 @@ export default function RefactorPage() {
                             <AccordionItem value="manual-add">
                                 <AccordionTrigger className="text-sm">Añadir operación manual</AccordionTrigger>
                                 <AccordionContent className="space-y-3 pt-4">
-                                     <div className="grid grid-cols-2 gap-3">
-                                         <div>
-                                            <Label className="text-xs">Scope</Label>
-                                            <select
-                                                value={newRename.scope}
-                                                onChange={(e) => setNewRename(prev => ({ ...prev, scope: e.target.value as "table" | "column" | "add-column" }))}
-                                                className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
-                                            >
-                                                <option value="table">Table</option>
-                                                <option value="column">Column</option>
-                                                <option value="add-column">Add Column</option>
-                                            </select>
-                                        </div>
-                                         <div>
-                                            <Label className="text-xs">Table From</Label>
-                                            <Input value={newRename.tableFrom} onChange={(e) => setNewRename(prev => ({ ...prev, tableFrom: e.target.value }))} className="h-9 text-sm" />
-                                        </div>
-                                    </div>
-                                    {newRename.scope === 'table' && (
-                                        <div>
-                                            <Label className="text-xs">Table To</Label>
-                                            <Input value={newRename.tableTo} onChange={(e) => setNewRename(prev => ({ ...prev, tableTo: e.target.value }))} className="h-9 text-sm" />
-                                        </div>
-                                    )}
-                                    {newRename.scope === 'column' && (
-                                         <div className="grid grid-cols-2 gap-3">
-                                            <div>
-                                                <Label className="text-xs">Column From</Label>
-                                                <Input value={newRename.columnFrom} onChange={(e) => setNewRename(prev => ({ ...prev, columnFrom: e.target.value }))} className="h-9 text-sm" />
+                                     <div className="flex space-x-1 rounded-md bg-muted p-1">
+                                        <button onClick={() => setActivePlanTab("table")} className={cn(buttonVariants({ variant: activePlanTab === 'table' ? 'primary': 'ghost', size: 'sm' }), 'flex-1')}>Tabla</button>
+                                        <button onClick={() => setActivePlanTab("column")} className={cn(buttonVariants({ variant: activePlanTab === 'column' ? 'primary': 'ghost', size: 'sm' }), 'flex-1')}>Columna</button>
+                                        <button onClick={() => setActivePlanTab("add-column")} className={cn(buttonVariants({ variant: activePlanTab === 'add-column' ? 'primary': 'ghost', size: 'sm' }), 'flex-1')}>Añadir Columna</button>
+                                     </div>
+                                     <div className="pt-2">
+                                        {activePlanTab === 'table' && (
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <Label className="text-xs">Table From</Label>
+                                                    <Input value={newRename.tableFrom} onChange={(e) => setNewRename(prev => ({ ...prev, tableFrom: e.target.value, scope: 'table' }))} className="h-9 text-sm" />
+                                                </div>
+                                                <div>
+                                                    <Label className="text-xs">Table To</Label>
+                                                    <Input value={newRename.tableTo} onChange={(e) => setNewRename(prev => ({ ...prev, tableTo: e.target.value, scope: 'table' }))} className="h-9 text-sm" />
+                                                </div>
                                             </div>
-                                            <div>
-                                                <Label className="text-xs">Column To</Label>
-                                                <Input value={newRename.columnTo} onChange={(e) => setNewRename(prev => ({ ...prev, columnTo: e.target.value }))} className="h-9 text-sm" />
+                                        )}
+                                        {activePlanTab === 'column' && (
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <Label className="text-xs">Table From</Label>
+                                                    <Input value={newRename.tableFrom} onChange={(e) => setNewRename(prev => ({ ...prev, tableFrom: e.target.value, scope: 'column' }))} className="h-9 text-sm" />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <Label className="text-xs">Column From</Label>
+                                                        <Input value={newRename.columnFrom} onChange={(e) => setNewRename(prev => ({ ...prev, columnFrom: e.target.value, scope: 'column' }))} className="h-9 text-sm" />
+                                                    </div>
+                                                    <div>
+                                                        <Label className="text-xs">Column To</Label>
+                                                        <Input value={newRename.columnTo} onChange={(e) => setNewRename(prev => ({ ...prev, columnTo: e.target.value, scope: 'column' }))} className="h-9 text-sm" />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <Label className="text-xs">Type (Opcional)</Label>
+                                                    <Input value={newRename.type} onChange={(e) => setNewRename(prev => ({ ...prev, type: e.target.value, scope: 'column' }))} className="h-9 text-sm" />
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
-                                    {(newRename.scope === 'column' || newRename.scope === 'add-column') && (
-                                         <div>
-                                            <Label className="text-xs">Type</Label>
-                                            <Input value={newRename.type} onChange={(e) => setNewRename(prev => ({ ...prev, type: e.target.value }))} className="h-9 text-sm" />
-                                        </div>
-                                    )}
+                                        )}
+                                        {activePlanTab === 'add-column' && (
+                                            <div className="space-y-3">
+                                                 <div>
+                                                    <Label className="text-xs">Table</Label>
+                                                    <Input value={newColTable} onChange={(e) => setNewColTable(e.target.value)} className="h-9 text-sm" />
+                                                 </div>
+                                                 <div>
+                                                    <Label className="text-xs">Column Name</Label>
+                                                    <Input value={newColName} onChange={(e) => setNewColName(e.target.value)} className="h-9 text-sm" />
+                                                 </div>
+                                                  <div>
+                                                    <Label className="text-xs">Data Type</Label>
+                                                    <select
+                                                        value={baseType}
+                                                        onChange={(e) => setBaseType(e.target.value as any)}
+                                                        className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                                                    >
+                                                        <option value="nvarchar">nvarchar</option>
+                                                        <option value="varchar">varchar</option>
+                                                        <option value="int">int</option>
+                                                        <option value="decimal">decimal</option>
+                                                        <option value="bit">bit</option>
+                                                        <option value="date">date</option>
+                                                        <option value="datetime2">datetime2</option>
+                                                    </select>
+                                                  </div>
+                                                  {baseType === 'nvarchar' && (
+                                                    <div>
+                                                        <Label className="text-xs">Length</Label>
+                                                        <Input type="number" value={length} onChange={(e) => setLength(Number(e.target.value))} className="h-9 text-sm" />
+                                                    </div>
+                                                  )}
+                                                  {baseType === 'decimal' && (
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <Label className="text-xs">Precision</Label>
+                                                            <Input type="number" value={precision} onChange={(e) => setPrecision(Number(e.target.value))} className="h-9 text-sm" />
+                                                        </div>
+                                                        <div>
+                                                           <Label className="text-xs">Scale</Label>
+                                                            <Input type="number" value={scale} onChange={(e) => setScale(Number(e.target.value))} className="h-9 text-sm" />
+                                                        </div>
+                                                    </div>
+                                                  )}
+                                            </div>
+                                        )}
+                                     </div>
                                     <Button size="sm" onClick={handleAddManualRename} className="w-full">Añadir al plan</Button>
                                 </AccordionContent>
                             </AccordionItem>

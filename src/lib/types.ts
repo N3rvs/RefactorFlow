@@ -1,13 +1,9 @@
 
-export interface RenameOperation {
-  scope: "column" | "table" | "add-column";
-  tableFrom: string;
-  tableTo?: string;
-  columnFrom?: string;
-  columnTo?: string;
-  type?: string;
-  area?: "db" | "code" | "both";
-}
+export type RenameOperation =
+  | { scope: "table";  tableFrom: string; tableTo: string;  columnFrom?: undefined; columnTo?: undefined; type?: undefined, area?: undefined; }
+  | { scope: "column"; tableFrom: string; columnFrom: string; columnTo?: string; type?: string; tableTo?: undefined, area?: undefined; }
+  | { scope: "add-column"; tableFrom: string; columnTo: string; type: string; columnFrom?: undefined; tableTo?: undefined, area?: undefined; };
+
 export type CleanupRequest = {
   connectionString: string;
   renames: RenameOperation[];
@@ -108,3 +104,5 @@ export interface Table {
 export interface SchemaResponse {
     tables: Table[];
 }
+
+    
