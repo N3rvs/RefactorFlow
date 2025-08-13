@@ -79,12 +79,12 @@ function SchemaViewer({ schema, onRefresh, loading }: { schema: SchemaResponse |
                     <Accordion type="multiple" className="w-full max-h-64 overflow-y-auto pr-2">
                         {schema?.tables.map((table) => (
                             <AccordionItem value={table.name} key={table.name}>
-                                <AccordionTrigger className="text-sm font-light text-muted-foreground hover:no-underline hover:text-foreground py-2">
-                                    <div className="flex items-center space-x-2">
-                                        <Checkbox id={`table-${table.name}`} />
-                                        <label htmlFor={`table-${table.name}`} className="cursor-pointer">{table.name}</label>
-                                    </div>
-                                </AccordionTrigger>
+                                <div className="flex items-center text-sm font-light text-muted-foreground hover:no-underline hover:text-foreground py-2">
+                                  <Checkbox id={`table-${table.name}`} className="mr-2"/>
+                                  <AccordionTrigger noChevron>
+                                      <label htmlFor={`table-${table.name}`} className="cursor-pointer flex-1">{table.name}</label>
+                                  </AccordionTrigger>
+                                </div>
                                 <AccordionContent className="pl-6">
                                     <div className="space-y-1">
                                         {table.columns.map(col => (
