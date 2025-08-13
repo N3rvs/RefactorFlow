@@ -7,6 +7,13 @@ export interface RenameOperation {
   type?: string;
   area?: "db" | "code" | "both";
 }
+export type CleanupRequest = {
+  connectionString: string;
+  renames: RenameOperation[];
+  useSynonyms?: boolean;
+  useViews?: boolean;
+  cqrs?: boolean;
+};
 
 export type ApplyRequest = PlanRequest;
 
@@ -14,13 +21,12 @@ export interface RefactorPlan {
   renames: RenameOperation[];
 }
 
-export interface PlanRequest {
-  connectionString: string;
+export type PlanRequest = {
   renames: RenameOperation[];
-  useSynonyms: boolean;
-  useViews: boolean;
-  cqrs: boolean;
-}
+  useSynonyms?: boolean;
+  useViews?: boolean;
+  cqrs?: boolean;
+};
 
 export interface PlanResponse {
   sql: SqlScripts;
@@ -41,13 +47,7 @@ export interface RefactorRequest {
   cqrs: boolean;
 }
 
-export interface CleanupRequest {
-  connectionString: string;
-  renames: RenameOperation[];
-  useSynonyms: boolean;
-  useViews: boolean;
-  cqrs: boolean;
-}
+
 
 export interface CodeFixRequest {
     rootKey: string;

@@ -102,7 +102,7 @@ const initialNewRename: Omit<RenameOperation, 'scope'> = {
 
 
 export default function RefactorPage() {
-  const [connectionString, setConnectionString] = useState("server=myserver;Database=example;");
+  const [connectionString, setConnectionString] = useState("Server=NERVELESS;Database=StoreGuille;Trusted_Connection=True;Encrypt=True;TrustServerCertificate=True;");
   const [plan, setPlan] = useState<RefactorPlan>(initialPlan);
   const [newRename, setNewRename] = useState(initialNewRename);
   const [options, setOptions] = useState({ useSynonyms: true, useViews: true, cqrs: true });
@@ -127,7 +127,7 @@ export default function RefactorPage() {
     onSuccess: (data: T) => void,
     toastMessages: { loading: string; success: string; error: string }
   ) => {
-    if (!connectionString.trim() && !['codefix'].includes(loadingState)) {
+    if (!connectionString.trim() && !['codefix', 'plan'].includes(loadingState)) {
       toast({ variant: "destructive", title: "Connection string is required." });
       return;
     }
@@ -163,7 +163,7 @@ export default function RefactorPage() {
   );
 
   const handlePlan = () => handleApiCall(
-    () => generatePlan({ connectionString, renames: plan.renames, ...options }),
+    () => generatePlan({ renames: plan.renames, ...options }),
     "plan",
     (data) => setResult(prev => ({ ...prev, sql: data.sql, ok: true })),
     { loading: "Generating plan...", success: "Plan generated.", error: "Failed to generate plan." }
