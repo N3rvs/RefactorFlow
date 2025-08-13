@@ -115,6 +115,35 @@ function SchemaViewer({
             onPlanChange({ ...plan, renames: [...plan.renames, newRename] });
         }
     };
+    
+    const handleColumnTypeChange = (tableName: string, columnName: string, newType: string, originalType: string) => {
+        const isChangingType = newType && newType !== originalType;
+
+        let updatedRenames = [...plan.renames];
+        const existingRenameIndex = updatedRenames.findIndex(r => r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === columnName);
+
+        if (existingRenameIndex > -1) {
+            // If it exists, update it.
+            const existing = updatedRenames[existingRenameIndex];
+            if (isChangingType) {
+                 updatedRenames[existingRenameIndex] = { ...existing, type: newType };
+            } else {
+                 const { type, ...rest } = existing;
+                 updatedRenames[existingRenameIndex] = rest;
+            }
+        } else if (isChangingType) {
+            // If it doesn't exist, create it.
+            const newRename: RenameOperation = {
+                scope: 'column',
+                tableFrom: tableName,
+                columnFrom: columnName,
+                type: newType,
+            };
+            updatedRenames.push(newRename);
+        }
+        
+        onPlanChange({ ...plan, renames: updatedRenames });
+    };
 
 
     return (
@@ -159,7 +188,7 @@ function SchemaViewer({
                                 <AccordionContent className="pl-6">
                                     <div className="space-y-1">
                                         {table.columns.map(col => (
-                                            <div key={col.name} className="flex justify-between items-center text-xs group">
+                                            <div key={col.name} className="flex justify-between items-center text-xs group gap-2">
                                                 <div className="flex items-center gap-2 flex-1">
                                                    <Pencil className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
                                                    <Input 
@@ -169,7 +198,12 @@ function SchemaViewer({
                                                       onClick={(e) => e.stopPropagation()}
                                                    />
                                                 </div>
-                                                <Badge variant="outline" className="font-mono text-sky-400 border-sky-400/30">{col.sqlType}</Badge>
+                                                <Input 
+                                                    defaultValue={col.sqlType}
+                                                    className="h-7 text-xs border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent font-mono text-sky-400 w-24"
+                                                    onBlur={(e) => handleColumnTypeChange(table.name, col.name, e.target.value, col.sqlType)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
                                             </div>
                                         ))}
                                     </div>
@@ -452,7 +486,7 @@ export default function RefactorPage() {
                             <div key={index} className="flex items-center justify-between bg-muted/50 p-2 rounded-md">
                                 <div className="text-xs">
                                     <Badge variant="outline" className="mr-2">{op.scope}</Badge>
-                                    <span className="font-mono">{op.scope === 'table' ? `${op.tableFrom} -> ${op.tableTo}` : `${op.tableFrom}.${op.columnFrom} -> ${op.columnTo}`}</span>
+                                    <span className="font-mono">{op.scope === 'table' ? `${op.tableFrom} -> ${op.tableTo}` : `${op.tableFrom}.${op.columnFrom} -> ${op.columnTo || op.columnFrom}${op.type ? ` (${op.type})` : ''}`}</span>
                                 </div>
                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeRename(index)}>
                                     <XCircle className="h-4 w-4 text-muted-foreground" />
@@ -490,3 +524,4 @@ export default function RefactorPage() {
     </div>
   );
 }
+
