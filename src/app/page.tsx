@@ -146,7 +146,7 @@ function SchemaViewer({
                         {schema.tables.map((table) => (
                             <AccordionItem value={table.name} key={table.name}>
                                 <AccordionTrigger>
-                                  <div className="flex items-center gap-2 flex-1 group">
+                                  <div className="flex items-center gap-2 flex-1 group mr-4">
                                      <Pencil className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
                                      <Input 
                                         defaultValue={table.name}
