@@ -46,38 +46,35 @@ import ResultsPanel from "@/components/refactor/ResultsPanel";
 import { Checkbox } from "@/components/ui/checkbox";
 
 function SchemaViewer({ schema, onRefresh, loading }: { schema: SchemaResponse | null; onRefresh: () => void; loading: boolean }) {
-    if (!schema && !loading) {
-        return (
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">Esquema (opcional)</CardTitle>
-                </CardHeader>
-                <CardContent className="flex items-center justify-center text-muted-foreground h-48">
-                    <p className="text-xs">Presiona "Check Connection" para cargar el esquema.</p>
-                </CardContent>
-            </Card>
-        );
-    }
+    const hasSchema = schema && schema.tables && schema.tables.length > 0;
 
     return (
-        <Card>
+        <Card className="sticky top-20">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Esquema (opcional)</CardTitle>
+                <CardTitle className="text-base font-medium">Esquema de Base de Datos</CardTitle>
                 <Button variant="ghost" size="sm" onClick={onRefresh} disabled={loading} className="text-xs">
                     {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-2 h-3 w-3" />}
                     Refrescar
                 </Button>
             </CardHeader>
             <CardContent>
-                {loading ? (
+                {loading && (
                     <div className="space-y-2 py-4">
-                        <div className="h-6 rounded-md bg-muted animate-pulse" />
-                        <div className="h-6 rounded-md bg-muted animate-pulse" />
-                        <div className="h-6 rounded-md bg-muted animate-pulse" />
+                        <div className="h-8 rounded-md bg-muted animate-pulse" />
+                        <div className="h-8 rounded-md bg-muted animate-pulse" />
+                        <div className="h-8 rounded-md bg-muted animate-pulse" />
                     </div>
-                ) : (
-                    <Accordion type="multiple" className="w-full max-h-64 overflow-y-auto pr-2">
-                        {schema?.tables.map((table) => (
+                )}
+                 {!loading && !hasSchema && (
+                    <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-96">
+                        <Database className="h-16 w-16 mb-4" />
+                        <h3 className="text-lg font-medium">Conecta tu base de datos</h3>
+                        <p className="text-sm">Presiona "Check Connection" para cargar y visualizar el esquema.</p>
+                    </div>
+                )}
+                {hasSchema && !loading && (
+                    <Accordion type="multiple" className="w-full max-h-[70vh] overflow-y-auto pr-2">
+                        {schema.tables.map((table) => (
                             <AccordionItem value={table.name} key={table.name}>
                                 <div className="flex items-center text-sm font-light text-muted-foreground hover:no-underline hover:text-foreground py-2">
                                   <Checkbox id={`table-${table.name}`} className="mr-2"/>
@@ -367,7 +364,29 @@ export default function RefactorPage() {
                       )}
                     </CardContent>
                 </Card>
-
+                 <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base font-medium">Acciones</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                       <Button variant="outline" className="w-full justify-start" onClick={() => handleRefactor(false)} disabled={loading === 'preview'}>
+                          {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
+                          Preview
+                      </Button>
+                       <Button variant="outline" className="w-full justify-start" onClick={handlePlan} disabled={loading === 'plan'}>
+                          {loading === 'plan' ? <Loader2 className="animate-spin" /> : <FileText/>}
+                          Generate SQL
+                      </Button>
+                      <Button variant="destructive" className="w-full" onClick={() => handleRefactor(true)} disabled={loading === 'apply' || !result || result.apply === true}>
+                            {loading === 'apply' ? <Loader2 className="animate-spin" /> : null}
+                            Aplicar
+                      </Button>
+                       <Button variant="secondary" className="w-full" onClick={handleCleanup} disabled={loading === 'cleanup'}>
+                           {loading === 'cleanup' ? <Loader2 className="animate-spin" /> : null}
+                           Cleanup
+                        </Button>
+                    </CardContent>
+                </Card>
                 <Card>
                     <CardHeader>
                       <CardTitle className="text-base font-medium">Opciones</CardTitle>
@@ -397,42 +416,8 @@ export default function RefactorPage() {
 
               </div>
 
-              <div className="col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                  <div className="col-span-2">
-                    <ResultsPanel result={result} loading={!!loading} error={result?.error || null} />
-                  </div>
-                  <div className="col-span-1">
-                     <Card>
-                        <CardHeader>
-                          <CardTitle className="text-base font-medium">Acciones</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                           <Button variant="outline" className="w-full justify-start" onClick={() => handleRefactor(false)} disabled={loading === 'preview'}>
-                              {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
-                              Preview
-                          </Button>
-                           <Button variant="outline" className="w-full justify-start" onClick={handlePlan} disabled={loading === 'plan'}>
-                              {loading === 'plan' ? <Loader2 className="animate-spin" /> : <FileText/>}
-                              Generate SQL
-                          </Button>
-                          <Button variant="destructive" className="w-full" onClick={() => handleRefactor(true)} disabled={loading === 'apply' || !result || result.apply === true}>
-                                {loading === 'apply' ? <Loader2 className="animate-spin" /> : null}
-                                Aplicar
-                          </Button>
-                           <Button variant="secondary" className="w-full" onClick={handleCleanup} disabled={loading === 'cleanup'}>
-                               {loading === 'cleanup' ? <Loader2 className="animate-spin" /> : null}
-                               Cleanup
-                            </Button>
-                             <Button variant="outline" className="w-full justify-start" onClick={handleAnalyze} disabled={loading === 'analyze'}>
-                              {loading === 'analyze' ? <Loader2 className="animate-spin" /> : <Database/>}
-                              Analyze
-                          </Button>
-                        </CardContent>
-                    </Card>
-                  </div>
-                   <div className="col-span-1">
-                      <SchemaViewer schema={schema} onRefresh={handleAnalyze} loading={loading === 'analyze'} />
-                   </div>
+              <div className="col-span-3">
+                  <SchemaViewer schema={schema} onRefresh={handleAnalyze} loading={loading === 'analyze'} />
               </div>
             </div>
         </main>
@@ -440,8 +425,3 @@ export default function RefactorPage() {
     </div>
   );
 }
-
-
-    
-
-    
