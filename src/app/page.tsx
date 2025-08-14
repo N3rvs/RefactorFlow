@@ -30,8 +30,7 @@ import {
   DatabaseZap,
   Circle,
   Link2,
-  Github,
-  GitBranch
+  FolderGit2,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import ResultsPanel from "@/components/refactor/ResultsPanel";
@@ -46,7 +45,7 @@ function ConnectionManager() {
     const context = useContext(DbSessionContext);
     if (!context) throw new Error("ConnectionManager must be used within a DbSessionProvider");
     
-    const { sessionId, connect, loading, error, disconnect, sessionLoading } = context;
+    const { sessionId, connect, loading, error, disconnect } = context;
     const [cs, setCs] = useState("");
     const { toast } = useToast();
     const [name, setName] = useState("");
@@ -75,8 +74,8 @@ function ConnectionManager() {
                      <span>{sessionId ? 'Conectado' : 'Desconectado'}</span>
                   </div>
                 </div>
-                <Button variant="outline" className="w-full" onClick={disconnect} disabled={!sessionId || sessionLoading}>
-                     {sessionLoading ? <Loader2 className="animate-spin" /> : <Power />}
+                <Button variant="outline" className="w-full" onClick={disconnect} disabled={loading}>
+                     {loading ? <Loader2 className="animate-spin" /> : <Power />}
                      Desconectar
                 </Button>
              </div>
@@ -110,16 +109,17 @@ function ConnectionManager() {
 
 function RepositoryManager() {
     return (
-        <div className="space-y-4 p-2">
+        <div className="space-y-2 p-2">
             <h3 className="text-sm font-medium px-2">Repositorio de Código</h3>
-            <div className="p-2 rounded-lg bg-muted/50 text-sm text-muted-foreground text-center">
-                <Github className="mx-auto h-8 w-8 mb-2"/>
-                <p>Aún no has conectado un repositorio.</p>
+            <div className="p-3 rounded-lg bg-muted/50 text-sm">
+                <div className="flex items-center gap-3">
+                    <FolderGit2 className="h-8 w-8 text-primary"/>
+                    <div>
+                        <p className="font-semibold">Listo</p>
+                        <p className="text-muted-foreground text-xs">Ruta preconfigurada en servidor.</p>
+                    </div>
+                </div>
             </div>
-             <Button variant="outline" className="w-full">
-                <GitBranch className="mr-2 h-4 w-4"/>
-                Conectar Repositorio
-            </Button>
         </div>
     )
 }
@@ -128,7 +128,7 @@ export default function RefactorPage() {
   const context = useContext(DbSessionContext);
   if (!context) throw new Error("RefactorPage must be used within a DbSessionProvider");
   
-  const { sessionId, disconnect, loading: sessionLoading } = context;
+  const { sessionId } = context;
 
   const [plan, setPlan] = useState<RefactorPlan>(initialPlan);
   const [options, setOptions] = useState({ useSynonyms: true, useViews: true, cqrs: true, allowDestructive: false });
