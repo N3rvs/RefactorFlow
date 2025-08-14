@@ -50,9 +50,9 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
     
     if (!result) {
         return (
-            <div className="text-center text-muted-foreground py-16">
+            <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full bg-card rounded-lg border">
                 <DatabaseZap className="mx-auto h-12 w-12" />
-                <h3 className="mt-4 text-lg font-medium">Listo para Refactorizar</h3>
+                <h3 className="mt-4 text-lg font-medium">Listo para refactorizar</h3>
                 <p className="mt-1 text-sm">Los resultados de tus acciones aparecerán aquí.</p>
             </div>
         );
@@ -62,9 +62,9 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
     const changedFile = codefix?.files.find(f => f.changed);
 
     return (
-      <>
-      <Tabs defaultValue="summary" className="w-full">
-        <div className="px-6 pt-0">
+      <Card className="h-full">
+      <Tabs defaultValue="summary" className="w-full h-full flex flex-col">
+        <div className="px-6 pt-4">
           <TabsList className="grid w-full grid-cols-4 bg-muted/50">
             <TabsTrigger value="summary">Resumen</TabsTrigger>
             <TabsTrigger value="sql">SQL</TabsTrigger>
@@ -72,6 +72,7 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
             <TabsTrigger value="logs">Logs</TabsTrigger>
           </TabsList>
         </div>
+        <div className="flex-1 overflow-y-auto">
         <TabsContent value="summary" className="p-6">
             <div className="border rounded-md">
                 <div className="p-4 border-b flex justify-between items-center">
@@ -205,6 +206,7 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
                 </CardContent>
             </div>
         </TabsContent>
+        </div>
       </Tabs>
       {selectedFile && (
         <CodeDiffViewer 
@@ -212,26 +214,9 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
           onClose={() => setSelectedFile(null)}
         />
       )}
-      </>
+      </Card>
     );
   };
 
-  return (
-    <Card>
-       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base font-medium flex items-center gap-2">
-            <FileText className="h-4 w-4" /> Resultado
-        </CardTitle>
-        {result && (
-            <div className="flex items-center gap-2 text-sm">
-                <span className={`w-2 h-2 rounded-full ${result.ok ? 'bg-green-500' : 'bg-destructive'}`}></span>
-                <Badge variant={result.ok ? "default" : "destructive"} className={`text-xs ${result.ok ? 'bg-green-500/20 text-green-300 border-green-500/30' : ''}`}>
-                    {result.apply ? 'Aplicado' : 'Vista Previa'} - {result.ok ? "Éxito" : "Fallido"}
-                </Badge>
-            </div>
-        )}
-      </CardHeader>
-      <CardContent className="p-0">{renderContent()}</CardContent>
-    </Card>
-  );
+  return renderContent();
 }

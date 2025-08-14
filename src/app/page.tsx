@@ -1,47 +1,39 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef, useContext, useMemo } from "react";
-import type { RefactorPlan, RefactorResponse, SchemaResponse, RenameOperation, Table, Column } from "@/lib/types";
+import React, { useState, useEffect, useContext } from "react";
+import type { RefactorPlan, RefactorResponse, SchemaResponse, RenameOperation } from "@/lib/types";
 import { runRefactor, runCleanup, analyzeSchema, generatePlan, runCodeFix } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import Link from 'next/link';
 
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Separator } from "@/components/ui/separator";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 import {
   Wand2,
-  History,
   Loader2,
   CheckCircle,
-  AlertTriangle,
-  RefreshCw,
   Power,
   FileText,
   Trash2,
   Database,
-  Info,
-  PlusCircle,
-  XCircle,
   Eye,
   FileCode,
-  Box,
-  Pencil,
   Play,
-  KeyRound,
-  Link2,
-  Search,
+  DatabaseZap,
+  ChevronDown,
+  Circle,
+  Plus,
+  Link2
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import ResultsPanel from "@/components/refactor/ResultsPanel";
@@ -52,256 +44,90 @@ const initialPlan: RefactorPlan = {
   renames: [],
 };
 
-function ConnectionCard() {
+function ConnectionManager() {
     const context = useContext(DbSessionContext);
-    if (!context) throw new Error("ConnectionCard must be used within a DbSessionProvider");
+    if (!context) throw new Error("ConnectionManager must be used within a DbSessionProvider");
     
-    const { sessionId, connect, disconnect, loading, error } = context;
+    const { sessionId, connect, disconnect, loading, error, expiresAt } = context;
     const [cs, setCs] = useState("");
-    const [textareaName, setTextareaName] = useState("connection-string-ssr");
+    const [isConnecting, setIsConnecting] = useState(false);
     const { toast } = useToast();
+    const [name, setName] = useState("");
 
     useEffect(() => {
-        setTextareaName(`cs_${Math.random().toString(36).slice(2)}`);
+        // This ensures the random name is only generated on the client, avoiding hydration mismatches.
+        setName(`cs_${Math.random().toString(36).slice(2)}`);
     }, []);
+
+    useEffect(() => {
+        if (sessionId) {
+            setCs("");
+        }
+    }, [sessionId]);
 
     const onConnect = async () => {
         if (!cs.trim()) return;
+        setIsConnecting(true);
         try {
             await connect(cs.trim(), 3600);
-            setCs(""); 
-            toast({ title: "Conexión exitosa", description: "La sesión está activa. Analizando esquema..." });
+            toast({ title: "Conexión exitosa", description: "La sesión está activa. Ya puedes explorar el esquema." });
         } catch (err: any) {
             toast({ variant: "destructive", title: "Error de conexión", description: err.message });
+        } finally {
+            setIsConnecting(false);
         }
     };
     
+    if (sessionId) {
+        return null; // Don't show anything in the main panel if connected
+    }
+
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="font-medium text-base flex items-center gap-2">
-                    <Database className="h-4 w-4" />
-                    Conexión a la Base de Datos
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="space-y-2">
-                    <Label htmlFor="connection-string" className="text-xs text-muted-foreground">
-                        Cadena de Conexión (se usa una vez para crear una sesión efímera)
-                    </Label>
-                    <Textarea
-                        id="connection-string"
-                        value={cs}
-                        onChange={(e) => setCs(e.target.value)}
-                        placeholder="Pega aquí tu cadena de conexión"
-                        className="w-full h-24 p-2 rounded border font-mono text-sm"
-                        autoComplete="off"
-                        spellCheck={false}
-                        name={textareaName}
-                        data-lpignore="true" data-1p-ignore="true"
-                    />
-                    <Button onClick={onConnect} disabled={loading || !cs.trim()} className="w-full">
-                        {loading ? <Loader2 className="animate-spin" /> : <Link2 />}
-                        Conectar
-                    </Button>
-                </div>
-                {error && (
-                    <p className="mt-2 text-xs text-destructive">{error}</p>
-                )}
-            </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center h-full gap-8">
+             <div className="flex flex-col items-center justify-center text-center">
+                <DatabaseZap className="h-16 w-16 text-primary mb-4" />
+                <h2 className="text-2xl font-bold">Bienvenido a DB Refactor</h2>
+                <p className="text-muted-foreground mt-2 max-w-md">
+                    Para empezar, por favor introduce la cadena de conexión a tu base de datos. La conexión es efímera y segura.
+                </p>
+            </div>
+            <Card className="w-full max-w-lg">
+                <CardHeader>
+                    <CardTitle className="font-medium text-base flex items-center gap-2">
+                        <Power className="h-4 w-4" />
+                        Conectar a la Base de Datos
+                    </CardTitle>
+                    <CardDescription>
+                        Tu cadena de conexión se usa una sola vez para crear una sesión segura y no se almacena.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        <Textarea
+                            id="connection-string"
+                            value={cs}
+                            onChange={(e) => setCs(e.target.value)}
+                            placeholder="Pega aquí tu cadena de conexión..."
+                            className="w-full h-24 p-2 rounded border font-mono text-sm"
+                            autoComplete="off"
+                            spellCheck={false}
+                            name={name}
+                            data-lpignore="true" data-1p-ignore="true"
+                        />
+                        <Button onClick={onConnect} disabled={isConnecting || !cs.trim()} className="w-full">
+                            {isConnecting ? <Loader2 className="animate-spin" /> : <Link2 />}
+                            Conectar
+                        </Button>
+                    </div>
+                    {error && (
+                        <p className="mt-2 text-xs text-destructive">{error}</p>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
     );
 }
 
-function SchemaEditor({ 
-    schema, 
-    loading,
-    plan,
-    onPlanChange,
-    onRefresh,
-}: { 
-    schema: SchemaResponse | null; 
-    loading: boolean;
-    plan: RefactorPlan;
-    onPlanChange: (newPlan: RefactorPlan) => void;
-    onRefresh: () => void;
-}) {
-    const [newColumns, setNewColumns] = useState<Record<string, { name: string; type: string }>>({});
-    const [searchTerm, setSearchTerm] = useState("");
-
-    const handleTableNameChange = (originalName: string, newName: string) => {
-        if (!newName.trim() || newName === originalName) {
-            const updatedRenames = plan.renames.filter(r => !(r.scope === 'table' && r.tableFrom === originalName));
-            onPlanChange({ ...plan, renames: updatedRenames });
-            return;
-        }
-
-        const existingRenameIndex = plan.renames.findIndex(r => r.scope === 'table' && r.tableFrom === originalName);
-
-        if (existingRenameIndex > -1) {
-            const updatedRenames = [...plan.renames];
-            updatedRenames[existingRenameIndex].tableTo = newName;
-            onPlanChange({ ...plan, renames: updatedRenames });
-        } else {
-            const newRename: RenameOperation = { scope: 'table', tableFrom: originalName, tableTo: newName };
-            onPlanChange({ ...plan, renames: [...plan.renames, newRename] });
-        }
-    };
-    
-    const handleColumnNameChange = (tableName: string, originalName: string, newName: string) => {
-       if (!newName.trim() || newName === originalName) {
-            const updatedRenames = plan.renames.filter(r => !(r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === originalName));
-            onPlanChange({ ...plan, renames: updatedRenames });
-            return;
-        }
-        
-        const existingRenameIndex = plan.renames.findIndex(r => r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === originalName);
-
-        if (existingRenameIndex > -1) {
-             const updatedRenames = [...plan.renames];
-             updatedRenames[existingRenameIndex].columnTo = newName;
-             onPlanChange({ ...plan, renames: updatedRenames });
-        } else {
-            const newRename: RenameOperation = { scope: 'column', tableFrom: tableName, columnFrom: originalName, columnTo: newName };
-            onPlanChange({ ...plan, renames: [...plan.renames, newRename] });
-        }
-    };
-    
-    const handleColumnTypeChange = (tableName: string, columnName: string, newType: string, originalType: string) => {
-        const isChangingType = newType && newType !== originalType;
-
-        let updatedRenames = [...plan.renames];
-        const existingRenameIndex = updatedRenames.findIndex(r => r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === columnName);
-
-        if (existingRenameIndex > -1) {
-            const existing = updatedRenames[existingRenameIndex];
-            if (isChangingType) {
-                 updatedRenames[existingRenameIndex] = { ...existing, type: newType };
-            } else {
-                 const { type, ...rest } = existing;
-                 if(Object.keys(rest).length <= 3) { // scope, tableFrom, columnFrom
-                    updatedRenames = updatedRenames.filter((_, i) => i !== existingRenameIndex);
-                 } else {
-                    updatedRenames[existingRenameIndex] = rest;
-                 }
-            }
-        } else if (isChangingType) {
-            const newRename: RenameOperation = { scope: 'column', tableFrom: tableName, columnFrom: columnName, columnTo: columnName, type: newType };
-            updatedRenames.push(newRename);
-        }
-        
-        onPlanChange({ ...plan, renames: updatedRenames });
-    };
-
-    const handleAddNewColumn = (tableName: string) => {
-        const newId = `new-${tableName}-${Date.now()}`;
-        setNewColumns(prev => ({...prev, [newId]: { name: '', type: '' }}));
-    };
-
-    const handleNewColumnChange = (id: string, field: 'name' | 'type', value: string) => {
-        setNewColumns(prev => ({ ...prev, [id]: { ...prev[id], [field]: value }}));
-    };
-    
-    const { toast } = useToast();
-
-    const confirmAddColumn = (id: string, tableName: string) => {
-        const newColumn = newColumns[id];
-        if (newColumn && newColumn.name && newColumn.type) {
-            const newRename: RenameOperation = { scope: 'add-column', tableFrom: tableName, columnTo: newColumn.name, type: newColumn.type };
-            onPlanChange({ ...plan, renames: [...plan.renames, newRename] });
-            const tempNewCols = {...newColumns};
-            delete tempNewCols[id];
-            setNewColumns(tempNewCols);
-        } else {
-            toast({ variant: 'destructive', title: "Nombre y tipo de columna son requeridos."})
-        }
-    };
-
-    const cancelAddColumn = (id: string) => {
-        const tempNewCols = {...newColumns};
-        delete tempNewCols[id];
-        setNewColumns(tempNewCols);
-    };
-    
-    const enhancedTables = useMemo(() => {
-        if (!schema?.tables) return [];
-        const tablesWithPk = schema.tables.map(table => {
-            const pkIndex = table.indexes?.find(idx => idx.isPrimary);
-            const pkColumns = pkIndex ? pkIndex.columns : [];
-            const columnsWithPk = table.columns.map(col => ({ ...col, isPrimaryKey: pkColumns.includes(col.name) }));
-            return { ...table, columns: columnsWithPk };
-        });
-        if (!searchTerm) return tablesWithPk;
-        return tablesWithPk.filter(table => table.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    }, [schema, searchTerm]);
-
-    return (
-        <Card className="h-full flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <div className="flex items-center gap-2">
-                    <CardTitle className="text-base font-medium">Editor de Esquema</CardTitle>
-                </div>
-                <Button variant="ghost" size="sm" onClick={onRefresh} disabled={loading} className="text-xs">
-                    {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-2 h-3 w-3" />}
-                    Actualizar
-                </Button>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col">
-                <div className="relative mb-4">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Buscar tablas..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                </div>
-                {loading && (
-                    <div className="flex-1 flex items-center justify-center">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                )}
-                {!loading && (
-                    <div className="flex-1 overflow-y-auto pr-2">
-                        <Accordion type="multiple" className="w-full">
-                            {enhancedTables.map((table) => (
-                                <AccordionItem value={table.name} key={table.name}>
-                                    <AccordionTrigger>
-                                      <div className="flex items-center gap-2 flex-1 group mr-4">
-                                         <Pencil className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
-                                         <Input defaultValue={table.name} className="h-8 border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent" onBlur={(e) => handleTableNameChange(table.name, e.target.value)} onClick={(e) => e.stopPropagation()} />
-                                      </div>
-                                    </AccordionTrigger>
-                                    <AccordionContent className="pl-6">
-                                        <div className="space-y-1">
-                                            {table.columns.map(col => (
-                                                <div key={col.name} className="flex justify-between items-center text-xs group gap-2">
-                                                    <div className="flex items-center gap-2 flex-1">
-                                                        {col.isPrimaryKey ? <KeyRound className="h-3 w-3 text-amber-400" /> : <Pencil className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />}
-                                                       <Input defaultValue={col.name} className="h-7 text-xs border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent" onBlur={(e) => handleColumnNameChange(table.name, col.name, e.target.value)} onClick={(e) => e.stopPropagation()} />
-                                                    </div>
-                                                    <Input defaultValue={col.sqlType} className="h-7 text-xs border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent font-mono text-sky-400 w-28" onBlur={(e) => handleColumnTypeChange(table.name, col.name, e.target.value, col.sqlType)} onClick={(e) => e.stopPropagation()} />
-                                                </div>
-                                            ))}
-                                             {Object.entries(newColumns).filter(([id]) => id.includes(`-${table.name}-`)).map(([id, col]) => (
-                                                <div key={id} className="flex justify-between items-center text-xs group gap-2 p-2 bg-muted/50 rounded-md">
-                                                    <div className="flex items-center gap-2 flex-1">
-                                                       <Input placeholder="nombre_columna" className="h-7 text-xs" value={col.name} onChange={(e) => handleNewColumnChange(id, 'name', e.target.value)} onClick={(e) => e.stopPropagation()} />
-                                                    </div>
-                                                    <Input placeholder="tipo_sql" className="h-7 text-xs font-mono w-28" value={col.type} onChange={(e) => handleNewColumnChange(id, 'type', e.target.value)} onClick={(e) => e.stopPropagation()} />
-                                                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => confirmAddColumn(id, table.name)}><CheckCircle className="h-4 w-4 text-green-500"/></Button>
-                                                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => cancelAddColumn(id)}><XCircle className="h-4 w-4 text-red-500"/></Button>
-                                                </div>
-                                            ))}
-                                            <Button variant="ghost" size="sm" className="w-full mt-2 text-xs" onClick={() => handleAddNewColumn(table.name)}>
-                                                <PlusCircle className="mr-2 h-3 w-3" /> Añadir Columna
-                                            </Button>
-                                        </div>
-                                    </AccordionContent>
-                                </AccordionItem>
-                            ))}
-                        </Accordion>
-                    </div>
-                )}
-            </CardContent>
-        </Card>
-    );
-}
 
 export default function RefactorPage() {
   const context = useContext(DbSessionContext);
@@ -326,7 +152,7 @@ export default function RefactorPage() {
     if (error instanceof Error) return error.message;
     return "Ocurrió un error desconocido.";
   }
-
+  
   const handleApiCall = async <T,>(
     apiFn: () => Promise<T>,
     loadingState: "preview" | "apply" | "cleanup" | "analyze" | "plan" | "codefix",
@@ -369,7 +195,7 @@ export default function RefactorPage() {
         (data) => setSchema(data),
         { loading: "Analizando esquema...", success: "Análisis de esquema completado.", error: "Falló el análisis de esquema." }
     );
-  }, [sessionId]);
+  }, [sessionId, toast]);
 
   useEffect(() => {
     if (sessionId && !schema) {
@@ -385,6 +211,7 @@ export default function RefactorPage() {
   );
 
   const handleRefactor = (apply: boolean) => {
+    if (!sessionId) return;
     handleApiCall(
     () => runRefactor({ sessionId, plan, apply, rootKey, ...options }),
     apply ? "apply" : "preview",
@@ -407,6 +234,7 @@ export default function RefactorPage() {
   };
   
   const handleCleanup = () => {
+    if (!sessionId) return;
     handleApiCall(
         () => runCleanup({ sessionId, renames: plan.renames, ...options }),
         "cleanup",
@@ -430,72 +258,84 @@ export default function RefactorPage() {
     }
   );
 
-  const removeRename = (index: number) => {
-    setPlan(prev => ({ ...prev, renames: prev.renames.filter((_, i) => i !== index) }));
-  };
-  
   const MainContent = () => {
     if (!sessionId) {
-        return (
-            <div className="w-full max-w-md mx-auto mt-20">
-                <ConnectionCard />
-            </div>
-        );
+        return <ConnectionManager />;
     }
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 h-full">
-            <div className="lg:col-span-3 h-full">
-                <SchemaEditor 
-                    schema={schema} 
-                    loading={loading === 'analyze' || sessionLoading && !schema} 
-                    plan={plan} 
-                    onPlanChange={setPlan}
-                    onRefresh={handleAnalyze}
-                />
-            </div>
-            <div className="lg:col-span-2 flex flex-col gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
+            {/* Left Column */}
+            <div className="md:col-span-1 flex flex-col gap-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Conexión</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                       <p className="text-sm text-muted-foreground">Sesión activa.</p>
+                    </CardContent>
+                </Card>
                  <Card>
                     <CardHeader>
-                      <CardTitle className="text-base font-medium">Plan de Refactorización</CardTitle>
-                      <CardContent className="space-y-2 pt-4">
-                          {plan.renames.length === 0 ? (
-                            <p className="text-sm text-muted-foreground text-center py-4">Edita el esquema para añadir cambios al plan.</p>
-                          ) : (
-                            <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                              {plan.renames.map((op, index) => {
-                                const isDestructive = op.scope.startsWith('drop');
-                                return (
-                                    <div key={index} className={cn("flex items-center justify-between bg-muted/50 p-2 rounded-md", isDestructive && "bg-destructive/10")}>
-                                        <div className="text-xs">
-                                            <Badge variant={isDestructive ? "destructive" : "outline"} className="mr-2">{op.scope}</Badge>
-                                            <span className="font-mono">{
-                                                op.scope === 'table' ? `${op.tableFrom} -> ${op.tableTo}` : 
-                                                op.scope === 'add-column' ? `ADD ${op.columnTo}(${op.type}) TO ${op.tableFrom}` :
-                                                op.scope === 'drop-table' ? op.tableFrom :
-                                                op.scope === 'drop-column' ? `${op.tableFrom}.${op.columnFrom}` :
-                                                `${op.tableFrom}.${op.columnFrom} -> ${op.columnTo || ''}${op.type ? ` (${op.type})` : ''}`
-                                            }</span>
-                                        </div>
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeRename(index)}>
-                                            <XCircle className="h-4 w-4 text-muted-foreground" />
-                                        </Button>
-                                    </div>
-                                )
-                              })}
-                            </div>
-                          )}
-                      </CardContent>
+                        <CardTitle className="text-base">Repositorio</CardTitle>
                     </CardHeader>
+                    <CardContent>
+                       <p className="text-sm text-muted-foreground">No configurado.</p>
+                    </CardContent>
                 </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Opciones</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="use-synonyms">Usar Sinónimos</Label>
+                            <Switch id="use-synonyms" checked={options.useSynonyms} onCheckedChange={(c) => setOptions(p => ({...p, useSynonyms: c}))} />
+                        </div>
+                         <div className="flex items-center justify-between">
+                            <Label htmlFor="use-views">Usar Vistas</Label>
+                            <Switch id="use-views" checked={options.useViews} onCheckedChange={(c) => setOptions(p => ({...p, useViews: c}))} />
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
 
-                <ResultsPanel result={result} loading={!!loading && loading !== 'analyze'} error={result?.error || null} />
-
+            {/* Right Column */}
+            <div className="md:col-span-2 flex flex-col gap-6">
+                <div className="flex items-center justify-between">
+                    <Button variant="outline"><Plus className="mr-2"/> Añadir operacion manual</Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost">Resultado <ChevronDown className="ml-2"/></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem>SQL</DropdownMenuItem>
+                        <DropdownMenuItem>CodeFix</DropdownMenuItem>
+                         <DropdownMenuItem>Logs</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+                 <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleRefactor(false)} disabled={loading === 'preview' || plan.renames.length === 0}>
+                          {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
+                          Vista Previa DB
+                      </Button>
+                       <Button variant="outline" size="sm" onClick={handlePlan} disabled={loading === 'plan' || plan.renames.length === 0}>
+                          {loading === 'plan' ? <Loader2 className="animate-spin" /> : <FileText/>}
+                          Generar SQL
+                      </Button>
+                       <Button variant="outline" size="sm" onClick={() => handleCodefix(false)} disabled={loading === 'codefix' || plan.renames.length === 0}>
+                          {loading === 'codefix' ? <Loader2 className="animate-spin" /> : <FileCode/>}
+                          Vista Previa Código
+                      </Button>
+                 </div>
+                 <div className="flex-1">
+                    <ResultsPanel result={result} loading={!!loading && loading !== 'analyze'} error={result?.error || null} />
+                 </div>
             </div>
         </div>
     );
   };
-
 
   return (
     <div className="flex min-h-screen bg-background text-foreground font-sans">
@@ -507,70 +347,36 @@ export default function RefactorPage() {
               <SidebarMenu>
                   <SidebarMenuItem>
                       <SidebarMenuButton isActive>
-                          <Wand2 />
-                          Refactorizar
+                          <Circle className={`mr-2 h-2 w-2 ${sessionId ? 'text-green-500' : 'text-muted-foreground'}`} />
+                          Conexión
                       </SidebarMenuButton>
                   </SidebarMenuItem>
+                   <SidebarMenuItem>
+                      <Button variant="ghost" className="w-full justify-start" onClick={disconnect} disabled={!sessionId || sessionLoading}>
+                         Desconectar
+                      </Button>
+                  </SidebarMenuItem>
               </SidebarMenu>
-          </SidebarContent>
-          <SidebarFooter>
-             <div className="p-2 border-t border-border">
-                {sessionId ? (
-                     <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm p-2">
-                          <div className="flex items-center gap-2 text-green-400">
-                             <CheckCircle className="h-4 w-4" />
-                             <span>Conectado</span>
-                          </div>
-                        </div>
-                        {expiresAt && (
-                            <p className="text-xs text-muted-foreground px-2">
-                                Expira a las {new Date(expiresAt).toLocaleTimeString()}
-                            </p>
-                        )}
-                        <Button variant="outline" className="w-full" onClick={disconnect} disabled={sessionLoading}>
-                             {sessionLoading ? <Loader2 className="animate-spin" /> : <Power />}
-                             Desconectar
-                        </Button>
-                     </div>
-                ) : (
-                    <div className="text-sm text-muted-foreground p-2">
-                        No conectado
-                    </div>
-                )}
+               <div className="p-2 mt-auto">
+                 <div className="h-20 bg-muted rounded-md mb-4" />
+                 <Link href="/schema" passHref legacyBehavior>
+                    <a className={cn(buttonVariants({ variant: 'default', size: 'lg' }), 'w-full bg-accent hover:bg-accent/90')}>
+                        Explorar esquema
+                    </a>
+                </Link>
               </div>
-          </SidebarFooter>
+          </SidebarContent>
       </Sidebar>
       <SidebarInset>
-        <main className="flex-grow p-4 sm:p-6 lg:p-8 h-full">
+        <main className="flex-grow p-4 sm:p-6 lg:p-8 h-full flex flex-col">
             <header className="flex items-center justify-between mb-6">
-                <h1 className="text-2xl font-bold">Herramienta de Refactorización de BD</h1>
-                {sessionId && (
-                    <div className="flex items-center gap-4">
-                      <Button variant="outline" onClick={() => handleRefactor(false)} disabled={loading === 'preview' || plan.renames.length === 0}>
-                          {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
-                          Vista Previa BD
-                      </Button>
-                       <Button variant="outline" onClick={handlePlan} disabled={loading === 'plan' || plan.renames.length === 0}>
-                          {loading === 'plan' ? <Loader2 className="animate-spin" /> : <FileText/>}
-                          Generar SQL
-                      </Button>
-                       <Button variant="outline" onClick={() => handleCodefix(false)} disabled={loading === 'codefix' || plan.renames.length === 0}>
-                          {loading === 'codefix' ? <Loader2 className="animate-spin" /> : <FileCode/>}
-                          Vista Previa Código
-                      </Button>
-                      <Button variant="destructive" onClick={() => handleRefactor(true)} disabled={loading === 'apply' || plan.renames.length === 0}>
-                            {loading === 'apply' ? <Loader2 className="animate-spin" /> : <Play />}
-                            Aplicar Cambios
-                      </Button>
-                      <Button variant="secondary" onClick={triggerCleanup} disabled={loading === 'cleanup'}>
-                           {loading === 'cleanup' ? <Loader2 className="animate-spin" /> : <Trash2 />}
-                           Limpieza
-                        </Button>
-                    </div>
-                )}
+                <Card className="flex-1">
+                    <CardContent className="p-2">
+                        <Input placeholder="Pran de refactorizar" className="border-none focus-visible:ring-0" />
+                    </CardContent>
+                </Card>
             </header>
-            <div className="h-[calc(100%-4rem)]">
+            <div className="flex-1">
                 <MainContent />
             </div>
         </main>
@@ -606,3 +412,5 @@ export default function RefactorPage() {
     </div>
   );
 }
+
+    
