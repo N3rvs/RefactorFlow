@@ -72,7 +72,14 @@ const initialNewRename: Partial<RenameOperation> = {
 function ConnectionCard() {
     const { sessionId, connect, disconnect, expiresAt, loading, error } = useDbSession();
     const [cs, setCs] = useState("");
+    const [textareaName, setTextareaName] = useState("connection-string-ssr");
     const { toast } = useToast();
+
+    useEffect(() => {
+        // Evita el error de hidratación de React al asegurar que el nombre aleatorio
+        // se genera solo en el cliente, después del montaje.
+        setTextareaName(`cs_${Math.random().toString(36).slice(2)}`);
+    }, []);
 
     const onConnect = async () => {
         if (!cs.trim()) return;
@@ -109,7 +116,7 @@ function ConnectionCard() {
                             className="w-full h-24 p-2 rounded border font-mono text-sm"
                             autoComplete="off"
                             spellCheck={false}
-                            name={`cs_${Math.random().toString(36).slice(2)}`}
+                            name={textareaName}
                             data-lpignore="true" data-1p-ignore="true"
                         />
                         <Button onClick={onConnect} disabled={loading || !cs.trim()} className="w-full">
