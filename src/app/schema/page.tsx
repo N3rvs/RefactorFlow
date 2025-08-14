@@ -3,38 +3,28 @@
 
 import React, { useState, useEffect, useContext, useMemo } from "react";
 import { useDbSession } from "@/hooks/useDbSession";
-import { analyzeSchema, runRefactor, generatePlan, runCodeFix } from "@/lib/api";
+import { analyzeSchema, runRefactor } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import type { RefactorPlan, RefactorResponse, SchemaResponse, RenameOperation, Table, Column } from "@/lib/types";
+import type { RefactorPlan, SchemaResponse, RenameOperation, Table, Column } from "@/lib/types";
 import {
   Wand2,
-  History,
   Loader2,
-  CheckCircle,
-  AlertTriangle,
   RefreshCw,
-  Power,
-  FileText,
-  Trash2,
   Database,
-  Info,
-  PlusCircle,
-  XCircle,
-  Eye,
-  FileCode,
-  Box,
   Pencil,
   Play,
   KeyRound,
-  Link2,
   Search,
+  PlusCircle,
+  XCircle,
+  Power,
+  CheckCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
 import { Logo } from "@/components/logo";
 import Link from 'next/link';
@@ -188,7 +178,12 @@ function SchemaEditor({
                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     </div>
                 )}
-                {!loading && (
+                {!loading && schema?.tables.length === 0 && (
+                     <div className="flex-1 flex items-center justify-center text-center text-muted-foreground">
+                        <p>No se encontraron tablas. Verifica la cadena de conexión o los permisos.</p>
+                    </div>
+                )}
+                {!loading && schema && schema.tables.length > 0 && (
                     <div className="flex-1 overflow-y-auto pr-2">
                         <Accordion type="multiple" className="w-full">
                             {enhancedTables.map((table) => (
@@ -293,9 +288,14 @@ export default function SchemaPage() {
         try {
           const data = await analyzeSchema(sessionId);
           setSchema(data);
-          toast({ title: "Esquema analizado con éxito." });
+          if (data.tables.length > 0) {
+            toast({ title: "Esquema analizado con éxito." });
+          } else {
+            toast({ variant: "default", title: "Análisis completado", description: "No se encontraron tablas." });
+          }
         } catch (err: any) {
           toast({ variant: "destructive", title: "Error al analizar", description: err.message });
+          setSchema({ tables: [] }); // Clear schema on error
         } finally {
           setLoadingSchema(false);
         }
@@ -310,6 +310,26 @@ export default function SchemaPage() {
     const removeRename = (index: number) => {
         setPlan(prev => ({ ...prev, renames: prev.renames.filter((_, i) => i !== index) }));
     };
+    
+    const handleApply = async () => {
+        if (!sessionId) {
+            toast({ variant: "destructive", title: "La sesión no está activa." });
+            return;
+        }
+        if (plan.renames.length === 0) {
+            toast({ variant: "destructive", title: "El plan está vacío." });
+            return;
+        }
+        
+        try {
+            await runRefactor({ sessionId, plan, apply: true, rootKey: 'SOLUTION', useSynonyms: true, useViews: true, cqrs: true });
+            toast({ title: "Plan aplicado con éxito" });
+            handleAnalyze(); // Re-fetch schema
+        } catch(err: any) {
+            toast({ variant: "destructive", title: "Error al aplicar el plan", description: err.message });
+        }
+    };
+
 
     if (!sessionId) {
         return (
@@ -336,14 +356,14 @@ export default function SchemaPage() {
                      <SidebarMenu>
                         <SidebarMenuItem>
                             <Link href="/" passHref legacyBehavior>
-                                <SidebarMenuButton variant="outline" size="lg" className="w-full">
+                                <SidebarMenuButton>
                                     <Wand2 />
                                     Refactorizar
                                 </SidebarMenuButton>
                             </Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                            <SidebarMenuButton isActive size="lg">
+                            <SidebarMenuButton isActive>
                                 <Database />
                                 Explorar Esquema
                             </SidebarMenuButton>
@@ -370,12 +390,12 @@ export default function SchemaPage() {
                 <main className="flex-grow p-4 sm:p-6 lg:p-8 h-screen flex flex-col">
                     <header className="flex items-center justify-between mb-6">
                         <h1 className="text-2xl font-bold">Explorador de Esquema</h1>
-                         <Button variant="destructive" disabled={plan.renames.length === 0}>
+                         <Button onClick={handleApply} disabled={plan.renames.length === 0} className="bg-destructive hover:bg-destructive/90">
                             <Play className="mr-2" />
                             Aplicar Plan
                         </Button>
                     </header>
-                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 flex-1">
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 flex-1 min-h-0">
                         <div className="lg:col-span-3 h-full">
                            <SchemaEditor 
                              schema={schema}
@@ -394,3 +414,5 @@ export default function SchemaPage() {
         </div>
     );
 }
+
+    

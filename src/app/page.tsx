@@ -48,7 +48,7 @@ function ConnectionManager() {
     const context = useContext(DbSessionContext);
     if (!context) throw new Error("ConnectionManager must be used within a DbSessionProvider");
     
-    const { sessionId, connect, disconnect, loading, error, expiresAt } = context;
+    const { sessionId, connect, disconnect, loading, error } = context;
     const [cs, setCs] = useState("");
     const [isConnecting, setIsConnecting] = useState(false);
     const { toast } = useToast();
@@ -133,11 +133,11 @@ export default function RefactorPage() {
   const context = useContext(DbSessionContext);
   if (!context) throw new Error("RefactorPage must be used within a DbSessionProvider");
   
-  const { sessionId, disconnect, loading: sessionLoading, expiresAt } = context;
+  const { sessionId, disconnect, loading: sessionLoading } = context;
 
   const [plan, setPlan] = useState<RefactorPlan>(initialPlan);
   const [options, setOptions] = useState({ useSynonyms: true, useViews: true, cqrs: true, allowDestructive: false });
-  const [rootKey, setRootKey] = useState("SOLUTION");
+  const [rootKey] = useState("SOLUTION");
   
   const [loading, setLoading] = useState<"preview" | "apply" | "cleanup" | "analyze" | "plan" | "codefix" | false>(false);
   const [result, setResult] = useState<RefactorResponse | null>(null);
@@ -225,12 +225,7 @@ export default function RefactorPage() {
   }
 
   const triggerCleanup = () => {
-    const hasDestructiveOps = plan.renames.some(op => op.scope.startsWith('drop'));
-    if (hasDestructiveOps || options.allowDestructive) {
-      setCleanupAlertOpen(true);
-    } else {
-      handleCleanup();
-    }
+    setCleanupAlertOpen(true);
   };
   
   const handleCleanup = () => {
@@ -264,71 +259,51 @@ export default function RefactorPage() {
     }
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
-            {/* Left Column */}
-            <div className="md:col-span-1 flex flex-col gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+            <div className="lg:col-span-1 flex flex-col gap-6">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Conexión</CardTitle>
+                        <CardTitle className="text-base font-medium flex items-center gap-2"><Power className="h-4 w-4" /> Conexión</CardTitle>
                     </CardHeader>
                     <CardContent>
-                       <p className="text-sm text-muted-foreground">Sesión activa.</p>
+                       <div className="flex items-center justify-between text-sm">
+                         <div className="flex items-center gap-2 text-green-400">
+                           <CheckCircle className="h-4 w-4" />
+                           <span>Conectado</span>
+                         </div>
+                         <Button variant="ghost" size="sm" onClick={disconnect} disabled={sessionLoading}>
+                            {sessionLoading ? <Loader2 className="animate-spin h-3 w-3"/> : "Desconectar"}
+                         </Button>
+                       </div>
                     </CardContent>
                 </Card>
                  <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Repositorio</CardTitle>
+                        <CardTitle className="text-base font-medium flex items-center gap-2"><Database className="h-4 w-4" /> Repositorio</CardTitle>
                     </CardHeader>
                     <CardContent>
                        <p className="text-sm text-muted-foreground">No configurado.</p>
+                       <Button variant="outline" size="sm" className="mt-2">Configurar</Button>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Opciones</CardTitle>
+                        <CardTitle className="text-base font-medium">Opciones</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-4 pt-4">
                         <div className="flex items-center justify-between">
-                            <Label htmlFor="use-synonyms">Usar Sinónimos</Label>
+                            <Label htmlFor="use-synonyms" className="text-sm">Usar Sinónimos</Label>
                             <Switch id="use-synonyms" checked={options.useSynonyms} onCheckedChange={(c) => setOptions(p => ({...p, useSynonyms: c}))} />
                         </div>
                          <div className="flex items-center justify-between">
-                            <Label htmlFor="use-views">Usar Vistas</Label>
+                            <Label htmlFor="use-views" className="text-sm">Usar Vistas</Label>
                             <Switch id="use-views" checked={options.useViews} onCheckedChange={(c) => setOptions(p => ({...p, useViews: c}))} />
                         </div>
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Right Column */}
-            <div className="md:col-span-2 flex flex-col gap-6">
-                <div className="flex items-center justify-between">
-                    <Button variant="outline"><Plus className="mr-2"/> Añadir operacion manual</Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost">Resultado <ChevronDown className="ml-2"/></Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem>SQL</DropdownMenuItem>
-                        <DropdownMenuItem>CodeFix</DropdownMenuItem>
-                         <DropdownMenuItem>Logs</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-                 <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleRefactor(false)} disabled={loading === 'preview' || plan.renames.length === 0}>
-                          {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
-                          Vista Previa DB
-                      </Button>
-                       <Button variant="outline" size="sm" onClick={handlePlan} disabled={loading === 'plan' || plan.renames.length === 0}>
-                          {loading === 'plan' ? <Loader2 className="animate-spin" /> : <FileText/>}
-                          Generar SQL
-                      </Button>
-                       <Button variant="outline" size="sm" onClick={() => handleCodefix(false)} disabled={loading === 'codefix' || plan.renames.length === 0}>
-                          {loading === 'codefix' ? <Loader2 className="animate-spin" /> : <FileCode/>}
-                          Vista Previa Código
-                      </Button>
-                 </div>
+            <div className="lg:col-span-2 flex flex-col gap-6">
                  <div className="flex-1">
                     <ResultsPanel result={result} loading={!!loading && loading !== 'analyze'} error={result?.error || null} />
                  </div>
@@ -347,35 +322,70 @@ export default function RefactorPage() {
               <SidebarMenu>
                   <SidebarMenuItem>
                       <SidebarMenuButton isActive>
-                          <Circle className={`mr-2 h-2 w-2 ${sessionId ? 'text-green-500' : 'text-muted-foreground'}`} />
-                          Conexión
+                          <Wand2 />
+                          Refactorizar
                       </SidebarMenuButton>
                   </SidebarMenuItem>
                    <SidebarMenuItem>
-                      <Button variant="ghost" className="w-full justify-start" onClick={disconnect} disabled={!sessionId || sessionLoading}>
-                         Desconectar
-                      </Button>
+                      <Link href="/schema" passHref legacyBehavior>
+                        <SidebarMenuButton>
+                           <Database />
+                           Explorar Esquema
+                        </SidebarMenuButton>
+                      </Link>
                   </SidebarMenuItem>
               </SidebarMenu>
-               <div className="p-2 mt-auto">
-                 <div className="h-20 bg-muted rounded-md mb-4" />
-                 <Link href="/schema" passHref legacyBehavior>
-                    <a className={cn(buttonVariants({ variant: 'default', size: 'lg' }), 'w-full bg-accent hover:bg-accent/90')}>
-                        Explorar esquema
-                    </a>
-                </Link>
-              </div>
           </SidebarContent>
+           <SidebarFooter>
+             <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm p-2">
+                  <div className={`flex items-center gap-2 ${sessionId ? 'text-green-400' : 'text-muted-foreground'}`}>
+                     <Circle className={`h-3 w-3 fill-current`} />
+                     <span>{sessionId ? 'Conectado' : 'Desconectado'}</span>
+                  </div>
+                </div>
+                <Button variant="outline" className="w-full" onClick={disconnect} disabled={!sessionId || sessionLoading}>
+                     {sessionLoading ? <Loader2 className="animate-spin" /> : <Power />}
+                     Desconectar
+                </Button>
+             </div>
+           </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <main className="flex-grow p-4 sm:p-6 lg:p-8 h-full flex flex-col">
+        <main className="flex-grow p-4 sm:p-6 lg:p-8 h-screen flex flex-col">
             <header className="flex items-center justify-between mb-6">
-                <Card className="flex-1">
+                <Card className="flex-1 mr-4">
                     <CardContent className="p-2">
-                        <Input placeholder="Pran de refactorizar" className="border-none focus-visible:ring-0" />
+                        <Input placeholder="Describe tu plan de refactorización o edita el esquema directamente..." className="border-none focus-visible:ring-0 text-base" />
                     </CardContent>
                 </Card>
+                 <div className="flex items-center gap-2">
+                    <Button onClick={() => handleRefactor(true)} disabled={loading === 'apply' || plan.renames.length === 0} className="bg-destructive hover:bg-destructive/90">
+                        <Play className="mr-2"/>
+                        Aplicar Cambios
+                    </Button>
+                    <Button variant="outline" onClick={triggerCleanup} disabled={loading === 'cleanup' || plan.renames.length === 0}>
+                        <Trash2 className="mr-2"/>
+                        Limpieza
+                    </Button>
+                </div>
             </header>
+             <div className="bg-muted/30 p-2 rounded-lg mb-6">
+                <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleRefactor(false)} disabled={loading === 'preview' || plan.renames.length === 0}>
+                          {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
+                          Vista Previa DB
+                      </Button>
+                       <Button variant="outline" size="sm" onClick={handlePlan} disabled={loading === 'plan' || plan.renames.length === 0}>
+                          {loading === 'plan' ? <Loader2 className="animate-spin" /> : <FileText/>}
+                          Generar SQL
+                      </Button>
+                       <Button variant="outline" size="sm" onClick={() => handleCodefix(false)} disabled={loading === 'codefix' || plan.renames.length === 0}>
+                          {loading === 'codefix' ? <Loader2 className="animate-spin" /> : <FileCode/>}
+                          Vista Previa Código
+                      </Button>
+                 </div>
+             </div>
             <div className="flex-1">
                 <MainContent />
             </div>
