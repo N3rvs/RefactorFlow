@@ -349,6 +349,12 @@ export default function RefactorPage() {
   const removeRename = (index: number) => {
     setPlan(prev => ({ ...prev, renames: prev.renames.filter((_, i) => i !== index) }));
   };
+
+  useEffect(() => {
+    if (sessionId && !schema) {
+      handleAnalyze();
+    }
+  }, [sessionId, schema]);
   
   useEffect(() => {
     if (result && result.error) {
