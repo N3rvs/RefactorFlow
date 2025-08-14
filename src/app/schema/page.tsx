@@ -329,7 +329,7 @@ export default function SchemaPage() {
     return "Ocurrió un error desconocido.";
   }
 
-  const handleAnalyze = () => {
+  const handleAnalyze = React.useCallback(() => {
      if (!sessionId) {
       toast({ variant: "destructive", title: "Inicia una sesión en la página de Refactorizar para ver el esquema." });
       return;
@@ -352,13 +352,13 @@ export default function SchemaPage() {
       .finally(() => {
         setLoading(false);
       });
-  };
+  }, [sessionId, toast, dismiss]);
 
   useEffect(() => {
-    if(sessionId) {
+    if(sessionId && !schema) {
         handleAnalyze();
     }
-  }, [sessionId])
+  }, [sessionId, schema, handleAnalyze])
 
   return (
     <div className="flex min-h-screen bg-background text-foreground font-sans">
