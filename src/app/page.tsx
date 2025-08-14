@@ -1,22 +1,21 @@
 
 "use client";
 
-import React, { useState, useEffect, useContext } from "react";
-import type { RefactorPlan, RefactorResponse, SchemaResponse, RenameOperation, Table } from "@/lib/types";
+import React, { useState, useEffect, useContext, useCallback, useMemo } from "react";
+import type { RefactorPlan, RefactorResponse, SchemaResponse, RenameOperation, Table, Column } from "@/lib/types";
 import { runRefactor, runCleanup, analyzeSchema, generatePlan, runCodeFix } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import Link from 'next/link';
 
 import { Sidebar, SidebarContent, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table as UiTable, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Wand2,
@@ -31,7 +30,12 @@ import {
   Trash2,
   FolderGit2,
   Link2,
-  Info
+  Info,
+  RefreshCw,
+  KeyRound,
+  Search,
+  PlusCircle,
+  XCircle
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import ResultsPanel from "@/components/refactor/ResultsPanel";
@@ -58,12 +62,11 @@ function ConnectionManager() {
         try {
           await connect(cs.trim(), 3600);
           toast({ title: "Conexión exitosa", description: "La sesión está activa. Ya puedes explorar el esquema." });
-          setCs("");
+          setCs(""); 
         } catch (err: any) {
           toast({ variant: "destructive", title: "Error de conexión", description: err.message });
         }
     };
-
 
     if (sessionId) {
         return (
@@ -187,71 +190,237 @@ function OptionsManager({ options, setOptions }: { options: { useSynonyms: boole
     );
 }
 
-function PlanManager({ plan, setPlan }: { plan: RefactorPlan, setPlan: React.Dispatch<React.SetStateAction<RefactorPlan>> }) {
-    const [newOp, setNewOp] = useState({ scope: 'column', tableFrom: '', columnFrom: '', tableTo: '' });
+function SchemaEditor({ 
+    schema, 
+    loading,
+    plan,
+    onPlanChange,
+    onRefresh,
+}: { 
+    schema: SchemaResponse | null; 
+    loading: boolean;
+    plan: RefactorPlan;
+    onPlanChange: (newPlan: RefactorPlan) => void;
+    onRefresh: () => void;
+}) {
+    const [newColumns, setNewColumns] = useState<Record<string, { name: string; type: string }>>({});
+    const [searchTerm, setSearchTerm] = useState("");
 
-    const handleAddOperation = () => {
-        if (!newOp.tableFrom) return; 
-        const op: RenameOperation = {
-            scope: newOp.scope as any,
-            tableFrom: newOp.tableFrom,
-            ...(newOp.scope === 'column' ? 
-                { columnFrom: newOp.columnFrom, columnTo: newOp.tableTo } : 
-                { tableTo: newOp.tableTo, columnFrom: undefined }
-            ),
-        };
-        setPlan(prev => ({ ...prev, renames: [...prev.renames, op] }));
-        setNewOp({ scope: 'column', tableFrom: '', columnFrom: '', tableTo: '' });
-    };
+    const handleTableNameChange = (originalName: string, newName: string) => {
+        if (!newName.trim() || newName === originalName) {
+            const updatedRenames = plan.renames.filter(r => !(r.scope === 'table' && r.tableFrom === originalName));
+            onPlanChange({ ...plan, renames: updatedRenames });
+            return;
+        }
 
-    const handleRemoveOperation = (index: number) => {
-        setPlan(prev => ({ ...prev, renames: prev.renames.filter((_, i) => i !== index) }));
+        const existingRenameIndex = plan.renames.findIndex(r => r.scope === 'table' && r.tableFrom === originalName);
+
+        if (existingRenameIndex > -1) {
+            const updatedRenames = [...plan.renames];
+            updatedRenames[existingRenameIndex].tableTo = newName;
+            onPlanChange({ ...plan, renames: updatedRenames });
+        } else {
+            const newRename: RenameOperation = { scope: 'table', tableFrom: originalName, tableTo: newName };
+            onPlanChange({ ...plan, renames: [...plan.renames, newRename] });
+        }
     };
     
+    const handleColumnNameChange = (tableName: string, originalName: string, newName: string) => {
+       if (!newName.trim() || newName === originalName) {
+            const updatedRenames = plan.renames.filter(r => !(r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === originalName));
+            onPlanChange({ ...plan, renames: updatedRenames });
+            return;
+        }
+        
+        const existingRenameIndex = plan.renames.findIndex(r => r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === originalName);
+
+        if (existingRenameIndex > -1) {
+             const updatedRenames = [...plan.renames];
+             updatedRenames[existingRenameIndex].columnTo = newName;
+             onPlanChange({ ...plan, renames: updatedRenames });
+        } else {
+            const newRename: RenameOperation = { scope: 'column', tableFrom: tableName, columnFrom: originalName, columnTo: newName };
+            onPlanChange({ ...plan, renames: [...plan.renames, newRename] });
+        }
+    };
+    
+    const handleColumnTypeChange = (tableName: string, columnName: string, newType: string, originalType: string) => {
+        const isChangingType = newType && newType !== originalType;
+
+        let updatedRenames = [...plan.renames];
+        const existingRenameIndex = updatedRenames.findIndex(r => r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === columnName);
+
+        if (existingRenameIndex > -1) {
+            const existing = updatedRenames[existingRenameIndex];
+            if (isChangingType) {
+                 updatedRenames[existingRenameIndex] = { ...existing, type: newType };
+            } else {
+                 const { type, ...rest } = existing;
+                 if(Object.keys(rest).length <= 3) { 
+                    updatedRenames = updatedRenames.filter((_, i) => i !== existingRenameIndex);
+                 } else {
+                    updatedRenames[existingRenameIndex] = rest;
+                 }
+            }
+        } else if (isChangingType) {
+            const newRename: RenameOperation = { scope: 'column', tableFrom: tableName, columnFrom: columnName, columnTo: columnName, type: newType };
+            updatedRenames.push(newRename);
+        }
+        
+        onPlanChange({ ...plan, renames: updatedRenames });
+    };
+
+    const handleAddNewColumn = (tableName: string) => {
+        const newId = `new-${tableName}-${Date.now()}`;
+        setNewColumns(prev => ({...prev, [newId]: { name: '', type: '' }}));
+    };
+
+    const handleNewColumnChange = (id: string, field: 'name' | 'type', value: string) => {
+        setNewColumns(prev => ({ ...prev, [id]: { ...prev[id], [field]: value }}));
+    };
+    
+    const { toast } = useToast();
+
+    const confirmAddColumn = (id: string, tableName: string) => {
+        const newColumn = newColumns[id];
+        if (newColumn && newColumn.name && newColumn.type) {
+            const newRename: RenameOperation = { scope: 'add-column', tableFrom: tableName, columnTo: newColumn.name, type: newColumn.type };
+            onPlanChange({ ...plan, renames: [...plan.renames, newRename] });
+            const tempNewCols = {...newColumns};
+            delete tempNewCols[id];
+            setNewColumns(tempNewCols);
+        } else {
+            toast({ variant: 'destructive', title: "Nombre y tipo de columna son requeridos."})
+        }
+    };
+
+    const cancelAddColumn = (id: string) => {
+        const tempNewCols = {...newColumns};
+        delete tempNewCols[id];
+        setNewColumns(tempNewCols);
+    };
+    
+    const enhancedTables = useMemo(() => {
+        if (!schema?.tables) return [];
+        const tablesWithPk = schema.tables.map(table => {
+            const pkIndex = table.indexes?.find(idx => idx.isPrimary);
+            const pkColumns = pkIndex ? pkIndex.columns : [];
+            const columnsWithPk = table.columns.map(col => ({ ...col, isPrimaryKey: pkColumns.includes(col.name) }));
+            return { ...table, columns: columnsWithPk };
+        });
+        if (!searchTerm) return tablesWithPk;
+        return tablesWithPk.filter(table => table.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    }, [schema, searchTerm]);
+
     return (
-        <Card className="flex-1">
-            <CardHeader>
-                <CardTitle>Plan de Refactorización</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="space-y-4">
-                    <div>
-                        <Label className="text-xs text-muted-foreground">Añadir operacion</Label>
-                        <div className="grid grid-cols-5 gap-2 mt-1">
-                            <Select value={newOp.scope} onValueChange={v => setNewOp({...newOp, scope: v})}>
-                                <SelectTrigger className="bg-input border-0 h-9"><SelectValue/></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="table">table</SelectItem>
-                                    <SelectItem value="column">column</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Input placeholder="TableFrom" value={newOp.tableFrom} onChange={e => setNewOp({...newOp, tableFrom: e.target.value})} className="bg-input border-0 h-9"/>
-                            <Input placeholder="ColumnFrom" value={newOp.columnFrom} onChange={e => setNewOp({...newOp, columnFrom: e.target.value})} disabled={newOp.scope !== 'column'} className="bg-input border-0 h-9" />
-                            <Input placeholder={newOp.scope === 'table' ? 'TableTo' : 'ColumnTo'} value={newOp.tableTo} onChange={e => setNewOp({...newOp, tableTo: e.target.value})} className="bg-input border-0 h-9"/>
-                            <Button onClick={handleAddOperation} variant="outline" size="sm">Añadir</Button>
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        {plan.renames.map((op, index) => (
-                             <div key={index} className="grid grid-cols-5 items-center gap-4 text-sm font-mono p-1 rounded-md hover:bg-muted/50">
-                                 <Badge variant="outline" className="w-20 justify-center">{op.scope}</Badge>
-                                 <span className="truncate">{op.tableFrom}</span>
-                                 <span className="truncate">{op.columnFrom ?? '-'}</span>
-                                 <span className="truncate">{op.scope === 'table' ? op.tableTo : op.columnTo}</span>
-                                 <div className="flex items-center justify-end">
-                                    <Button variant="ghost" size="icon" className="h-7 w-7"><Pencil className="h-4 w-4"/></Button>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRemoveOperation(index)}><Trash2 className="h-4 w-4"/></Button>
-                                 </div>
-                             </div>
-                        ))}
-                         {plan.renames.length === 0 && (
-                            <p className="text-sm text-muted-foreground text-center py-8">No hay operaciones en el plan.</p>
-                        )}
-                    </div>
+        <Card className="h-full flex flex-col">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <div className="flex items-center gap-2">
+                    <CardTitle className="text-base font-medium">Editor de Esquema</CardTitle>
                 </div>
+                <Button variant="ghost" size="sm" onClick={onRefresh} disabled={loading} className="text-xs">
+                    {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-2 h-3 w-3" />}
+                    Actualizar
+                </Button>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col p-4">
+                <div className="relative mb-4">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Buscar tablas..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                </div>
+                {loading && (
+                    <div className="flex-1 flex items-center justify-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                )}
+                {!loading && schema?.tables.length === 0 && (
+                     <div className="flex-1 flex items-center justify-center text-center text-muted-foreground">
+                        <p>No se encontraron tablas. Conéctate a una BD y actualiza.</p>
+                    </div>
+                )}
+                {!loading && schema && schema.tables.length > 0 && (
+                    <div className="flex-1 overflow-y-auto pr-2">
+                        <Accordion type="multiple" className="w-full">
+                            {enhancedTables.map((table) => (
+                                <AccordionItem value={table.name} key={table.name}>
+                                    <AccordionTrigger>
+                                      <div className="flex items-center gap-2 flex-1 group mr-4">
+                                         <Pencil className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
+                                         <Input defaultValue={table.name} className="h-8 border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent" onBlur={(e) => handleTableNameChange(table.name, e.target.value)} onClick={(e) => e.stopPropagation()} />
+                                      </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="pl-6">
+                                        <div className="space-y-1">
+                                            {table.columns.map(col => (
+                                                <div key={col.name} className="flex justify-between items-center text-xs group gap-2">
+                                                    <div className="flex items-center gap-2 flex-1">
+                                                        {col.isPrimaryKey ? <KeyRound className="h-3 w-3 text-amber-400" /> : <Pencil className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />}
+                                                       <Input defaultValue={col.name} className="h-7 text-xs border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent" onBlur={(e) => handleColumnNameChange(table.name, col.name, e.target.value)} onClick={(e) => e.stopPropagation()} />
+                                                    </div>
+                                                    <Input defaultValue={col.sqlType} className="h-7 text-xs border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent font-mono text-sky-400 w-28" onBlur={(e) => handleColumnTypeChange(table.name, col.name, e.target.value, col.sqlType)} onClick={(e) => e.stopPropagation()} />
+                                                </div>
+                                            ))}
+                                             {Object.entries(newColumns).filter(([id]) => id.includes(`-${table.name}-`)).map(([id, col]) => (
+                                                <div key={id} className="flex justify-between items-center text-xs group gap-2 p-2 bg-muted/50 rounded-md">
+                                                    <div className="flex items-center gap-2 flex-1">
+                                                       <Input placeholder="nombre_columna" className="h-7 text-xs" value={col.name} onChange={(e) => handleNewColumnChange(id, 'name', e.target.value)} onClick={(e) => e.stopPropagation()} />
+                                                    </div>
+                                                    <Input placeholder="tipo_sql" className="h-7 text-xs font-mono w-28" value={col.type} onChange={(e) => handleNewColumnChange(id, 'type', e.target.value)} onClick={(e) => e.stopPropagation()} />
+                                                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => confirmAddColumn(id, table.name)}><CheckCircle className="h-4 w-4 text-green-500"/></Button>
+                                                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => cancelAddColumn(id)}><XCircle className="h-4 w-4 text-red-500"/></Button>
+                                                </div>
+                                            ))}
+                                            <Button variant="ghost" size="sm" className="w-full mt-2 text-xs" onClick={() => handleAddNewColumn(table.name)}>
+                                                <PlusCircle className="mr-2 h-3 w-3" /> Añadir Columna
+                                            </Button>
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                    </div>
+                )}
             </CardContent>
         </Card>
     );
+}
+
+function PlanReview({ plan, onRemove }: { plan: RefactorPlan, onRemove: (index: number) => void}) {
+    return (
+         <Card>
+            <CardHeader>
+                <CardTitle className="text-base font-medium">Plan de Refactorización</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 pt-4">
+                {plan.renames.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">Edita el esquema para añadir cambios al plan.</p>
+                ) : (
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                    {plan.renames.map((op, index) => {
+                    const isDestructive = op.scope.startsWith('drop');
+                    return (
+                        <div key={index} className={cn("flex items-center justify-between bg-muted/50 p-2 rounded-md", isDestructive && "bg-destructive/10")}>
+                            <div className="text-xs">
+                                <Badge variant={isDestructive ? "destructive" : "outline"} className="mr-2">{op.scope}</Badge>
+                                <span className="font-mono">{
+                                    op.scope === 'table' ? `${op.tableFrom} -> ${op.tableTo}` : 
+                                    op.scope === 'add-column' ? `ADD ${op.columnTo}(${op.type}) TO ${op.tableFrom}` :
+                                    op.scope === 'drop-table' ? op.tableFrom :
+                                    op.scope === 'drop-column' ? `${op.tableFrom}.${op.columnFrom}` :
+                                    `${op.tableFrom}.${op.columnFrom} -> ${op.columnTo || ''}${op.type ? ` (${op.type})` : ''}`
+                                }</span>
+                            </div>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRemove(index)}>
+                                <XCircle className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                        </div>
+                    )
+                    })}
+                </div>
+                )}
+            </CardContent>
+        </Card>
+    )
 }
 
 export default function RefactorPage() {
@@ -264,13 +433,47 @@ export default function RefactorPage() {
   const [options, setOptions] = useState({ useSynonyms: true, useViews: true, cqrs: true, allowDestructive: false });
   const [rootKey, setRootKey] = useState("SOLUTION");
   
-  const [loading, setLoading] = useState<"preview" | "apply" | "cleanup" | "plan" | "codefix" | false>(false);
+  const [loading, setLoading] = useState<"preview" | "apply" | "cleanup" | "plan" | "codefix" | "schema" | false>(false);
   const [result, setResult] = useState<RefactorResponse | null>(null);
   
   const [isApplyAlertOpen, setApplyAlertOpen] = useState(false);
   const [actionModal, setActionModal] = useState<ActionModalType>(null);
   
+  const [schema, setSchema] = useState<SchemaResponse | null>(null);
+  
   const { toast, dismiss } = useToast();
+
+  const handleAnalyze = useCallback(async () => {
+    if (!sessionId) {
+      toast({ variant: "destructive", title: "No estás conectado", description: "Por favor, conéctate a una base de datos para analizar el esquema." });
+      return;
+    }
+    setLoading("schema");
+    try {
+      const data = await analyzeSchema(sessionId);
+      setSchema(data);
+      if (data.tables.length > 0) {
+        toast({ title: "Esquema analizado con éxito." });
+      } else {
+        toast({ variant: "default", title: "Análisis completado", description: "No se encontraron tablas." });
+      }
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Error al analizar", description: err.message });
+      setSchema({ tables: [] });
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId, toast]);
+
+  useEffect(() => {
+    if (sessionId) {
+        handleAnalyze();
+    }
+  }, [sessionId, handleAnalyze]);
+
+  const removeRename = (index: number) => {
+    setPlan(prev => ({ ...prev, renames: prev.renames.filter((_, i) => i !== index) }));
+  };
 
   const getErrorMessage = (error: unknown): string => {
     if (error instanceof Error) return error.message;
@@ -293,9 +496,7 @@ export default function RefactorPage() {
     }
 
     setLoading(loadingState);
-    if(loadingState !== 'plan' && loadingState !== 'codefix') {
-      setResult(null);
-    }
+    setResult(null);
     const { id } = toast({ title: toastMessages.loading, duration: 999999 });
 
     try {
@@ -307,9 +508,7 @@ export default function RefactorPage() {
       const errorMessage = getErrorMessage(err);
       dismiss(id);
       toast({ variant: "destructive", title: toastMessages.error, description: errorMessage, duration: 5000 });
-      if(loadingState !== 'analyze') {
-        setResult({ ok: false, error: errorMessage });
-      }
+      setResult({ ok: false, error: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -326,7 +525,7 @@ export default function RefactorPage() {
     handleApiCall(
     () => runRefactor({ sessionId: sessionId!, plan, apply: false, rootKey, ...options }),
     "preview",
-    (data) => setResult(prev => ({ ...prev, ...data })),
+    (data) => setResult(data),
     { 
       loading: "Generando vista previa...",
       success: "Vista previa generada.",
@@ -339,7 +538,7 @@ export default function RefactorPage() {
      handleApiCall(
         () => runRefactor({ sessionId: sessionId!, plan, apply: true, rootKey, ...options }),
         "apply",
-        (data) => setResult(prev => ({ ...prev, ...data })),
+        (data) => setResult(data),
         { 
           loading: "Aplicando cambios...",
           success: "Cambios aplicados.",
@@ -387,7 +586,7 @@ export default function RefactorPage() {
           <SidebarContent>
               <SidebarMenu>
                   <SidebarMenuItem>
-                      <Link href="/">
+                    <Link href="/">
                         <SidebarMenuButton isActive>
                             <Wand2 />
                             Refactorizar
@@ -395,10 +594,10 @@ export default function RefactorPage() {
                       </Link>
                   </SidebarMenuItem>
                    <SidebarMenuItem>
-                      <Link href="/schema">
+                    <Link href="/schema">
                         <SidebarMenuButton>
                            <Database />
-                           Esquema
+                           Resultados
                         </SidebarMenuButton>
                       </Link>
                   </SidebarMenuItem>
@@ -413,40 +612,41 @@ export default function RefactorPage() {
       </Sidebar>
       <SidebarInset>
         <main className="flex-grow p-4 sm:p-6 lg:p-8 h-screen flex flex-col">
-             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full items-start">
+             <header className="flex items-center justify-between mb-6">
+                <h1 className="text-2xl font-bold">Refactorizar Esquema</h1>
+                 <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setActionModal("preview")} disabled={!!loading || plan.renames.length === 0}>
+                        {loading === 'preview' ? <Loader2 className="animate-spin h-4 w-4" /> : <Eye className="h-4 w-4"/>}
+                        <span className="ml-2 hidden sm:inline">Vista Previa BD</span>
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setActionModal("codefix")} disabled={!!loading || plan.renames.length === 0}>
+                        {loading === 'codefix' ? <Loader2 className="animate-spin h-4 w-4" /> : <FolderGit2 className="h-4 w-4"/>}
+                        <span className="ml-2 hidden sm:inline">Vista Previa Código</span>
+                    </Button>
+                    <Button onClick={() => setApplyAlertOpen(true)} disabled={!!loading || plan.renames.length === 0} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                        {loading === 'apply' ? <Loader2 className="animate-spin h-4 w-4" /> : <Play className="h-4 w-4"/>}
+                        <span className="ml-2">Aplicar</span>
+                    </Button>
+                 </div>
+            </header>
+             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
                 {/* Columna Izquierda */}
+                <div className="lg:col-span-2 h-full">
+                    <SchemaEditor
+                        schema={schema}
+                        loading={loading === "schema"}
+                        plan={plan}
+                        onPlanChange={setPlan}
+                        onRefresh={handleAnalyze}
+                    />
+                </div>
+
+                {/* Columna Derecha */}
                 <div className="lg:col-span-1 flex flex-col gap-6">
                     <ConnectionManager/>
                     <RepositoryManager rootKey={rootKey} setRootKey={setRootKey}/>
                     <OptionsManager options={options} setOptions={setOptions}/>
-                </div>
-
-                {/* Columna Derecha */}
-                <div className="lg:col-span-2 flex flex-col gap-6 h-full">
-                    <PlanManager plan={plan} setPlan={setPlan}/>
-                    
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setActionModal("preview")} disabled={!!loading}>
-                            {loading === 'preview' ? <Loader2 className="animate-spin h-4 w-4" /> : <Eye className="h-4 w-4"/>}
-                            <span className="ml-2">Vista Previa BD</span>
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => setActionModal("plan")} disabled={!!loading}>
-                            {loading === 'plan' ? <Loader2 className="animate-spin h-4 w-4" /> : <FileCode className="h-4 w-4"/>}
-                            <span className="ml-2">Generar SQL</span>
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => setActionModal("codefix")} disabled={!!loading}>
-                            {loading === 'codefix' ? <Loader2 className="animate-spin h-4 w-4" /> : <FolderGit2 className="h-4 w-4"/>}
-                            <span className="ml-2">Vista Previa Código</span>
-                        </Button>
-                        <Button onClick={() => setApplyAlertOpen(true)} disabled={!!loading} className="ml-auto bg-primary text-primary-foreground hover:bg-primary/90">
-                            {loading === 'apply' ? <Loader2 className="animate-spin h-4 w-4" /> : <Play className="h-4 w-4"/>}
-                            <span className="ml-2">Aplicar</span>
-                        </Button>
-                    </div>
-
-                    <div className="flex-1 min-h-0">
-                       <ResultsPanel result={result} loading={!!loading} error={result?.error || null} />
-                    </div>
+                    <PlanReview plan={plan} onRemove={removeRename} />
                 </div>
              </div>
         </main>
