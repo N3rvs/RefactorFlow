@@ -35,6 +35,7 @@ import {
   KeyRound,
   Link2,
   Search,
+  CheckCircle,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Checkbox } from "@/components/ui/checkbox";
