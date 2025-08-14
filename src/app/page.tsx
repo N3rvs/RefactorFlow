@@ -112,23 +112,18 @@ function ConnectionManager() {
     );
 }
 
-function RepositoryManager() {
+function RepositoryManager({ rootKey, setRootKey }: { rootKey: string, setRootKey: (key: string) => void }) {
     return (
         <Card>
             <CardHeader>
                 <CardTitle className="text-base font-medium">Repositorio</CardTitle>
+                 <CardDescription className="text-xs">Define el `rootKey` para las operaciones de `CodeFix`.</CardDescription>
             </CardHeader>
             <CardContent>
-                 <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                        <FolderGit2 className="h-5 w-5 text-muted-foreground"/>
-                        <span className="font-medium">Repositorio Local</span>
-                    </div>
-                    <Badge variant="outline" className="text-green-400 border-green-400/50">Listo</Badge>
+                 <div className="space-y-2">
+                    <Label htmlFor="root-key">Clave Raíz</Label>
+                    <Input id="root-key" value={rootKey} onChange={(e) => setRootKey(e.target.value)} />
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                    La ruta del código fuente está preconfigurada en el servidor.
-                </p>
             </CardContent>
         </Card>
     );
@@ -303,7 +298,7 @@ export default function RefactorPage() {
 
   const [plan, setPlan] = useState<RefactorPlan>(initialPlan);
   const [options, setOptions] = useState({ useSynonyms: true, useViews: true, cqrs: true, allowDestructive: false });
-  const [rootKey] = useState("SOLUTION");
+  const [rootKey, setRootKey] = useState("SOLUTION");
   
   const [loading, setLoading] = useState<"preview" | "apply" | "cleanup" | "analyze" | "plan" | "codefix" | false>(false);
   const [result, setResult] = useState<RefactorResponse | null>(null);
@@ -446,7 +441,7 @@ export default function RefactorPage() {
                       </SidebarMenuButton>
                   </SidebarMenuItem>
                    <SidebarMenuItem>
-                      <Link href="/schema" asChild>
+                      <Link href="/schema" passHref asChild>
                         <SidebarMenuButton>
                            <Database />
                            Esquema
@@ -468,7 +463,7 @@ export default function RefactorPage() {
                 {/* Columna Izquierda */}
                 <div className="lg:col-span-1 flex flex-col gap-6">
                     <ConnectionManager/>
-                    <RepositoryManager/>
+                    <RepositoryManager rootKey={rootKey} setRootKey={setRootKey}/>
                     <OptionsManager options={options} setOptions={setOptions}/>
                 </div>
 
@@ -535,7 +530,5 @@ export default function RefactorPage() {
     </div>
   );
 }
-
-    
 
     
