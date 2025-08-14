@@ -45,34 +45,22 @@ function ConnectionManager() {
     const context = useContext(DbSessionContext);
     if (!context) throw new Error("ConnectionManager must be used within a DbSessionProvider");
     
-    const { sessionId, connect, loading, error, disconnect } = context;
-    const [cs, setCs] = useState("");
-    const { toast } = useToast();
-    const [name, setName] = useState("");
-
-    useEffect(() => {
-        setName(`cs_${Math.random().toString(36).slice(2)}`);
-    }, []);
-
-    const onConnect = async () => {
-        if (!cs.trim()) return;
-        try {
-            await connect(cs.trim(), 3600);
-            toast({ title: "Conexión exitosa", description: "La sesión está activa. Ya puedes explorar el esquema." });
-            setCs("");
-        } catch (err: any) {
-            toast({ variant: "destructive", title: "Error de conexión", description: err.message });
-        }
-    };
+    const { sessionId, loading, disconnect } = context;
     
     if (sessionId) {
         return (
-             <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm p-2">
-                  <div className={`flex items-center gap-2 ${sessionId ? 'text-green-400' : 'text-muted-foreground'}`}>
-                     <Circle className={`h-3 w-3 fill-current`} />
-                     <span>{sessionId ? 'Conectado' : 'Desconectado'}</span>
-                  </div>
+             <div className="space-y-2 p-2">
+                <h3 className="text-sm font-medium px-2">Conexión</h3>
+                <div className="p-3 rounded-lg bg-muted/50 text-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-green-500/20 rounded-full">
+                           <CheckCircle className="h-5 w-5 text-green-400"/>
+                        </div>
+                        <div>
+                            <p className="font-semibold">Conectado</p>
+                            <p className="text-muted-foreground text-xs">La sesión está activa.</p>
+                        </div>
+                    </div>
                 </div>
                 <Button variant="outline" className="w-full" onClick={disconnect} disabled={loading}>
                      {loading ? <Loader2 className="animate-spin" /> : <Power />}
@@ -83,27 +71,22 @@ function ConnectionManager() {
     }
 
     return (
-        <div className="space-y-4 p-2">
-            <h3 className="text-sm font-medium px-2">Conectar a Base de Datos</h3>
-            <Textarea
-                id="connection-string"
-                value={cs}
-                onChange={(e) => setCs(e.target.value)}
-                placeholder="Pega aquí tu cadena de conexión..."
-                className="w-full h-24 p-2 rounded border font-mono text-sm bg-background"
-                autoComplete="off"
-                spellCheck={false}
-                name={name}
-                data-lpignore="true" data-1p-ignore="true"
-            />
-            <Button onClick={onConnect} disabled={loading || !cs.trim()} className="w-full">
-                {loading ? <Loader2 className="animate-spin" /> : <Link2 />}
-                Conectar
-            </Button>
-            {error && (
-                <p className="mt-2 px-2 text-xs text-destructive">{error}</p>
-            )}
+      <div className="space-y-2 p-2">
+        <h3 className="text-sm font-medium px-2">Conectar a Base de Datos</h3>
+        <div className="p-3 rounded-lg bg-muted/50 text-sm">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-destructive/20 rounded-full">
+              <Power className="h-5 w-5 text-destructive/80" />
+            </div>
+            <div>
+              <p className="font-semibold">Desconectado</p>
+              <p className="text-muted-foreground text-xs">
+                Inicia una sesión para empezar.
+              </p>
+            </div>
+          </div>
         </div>
+      </div>
     );
 }
 
@@ -123,6 +106,69 @@ function RepositoryManager() {
         </div>
     )
 }
+
+function ConnectionView() {
+  const context = useContext(DbSessionContext);
+  if (!context) throw new Error("ConnectionView must be used within a DbSessionProvider");
+  
+  const { connect, loading, error } = context;
+  const [cs, setCs] = useState("");
+  const { toast } = useToast();
+  const [name, setName] = useState("");
+
+  useEffect(() => {
+    setName(`cs_${Math.random().toString(36).slice(2)}`);
+  }, []);
+
+  const onConnect = async () => {
+    if (!cs.trim()) return;
+    try {
+      await connect(cs.trim(), 3600);
+      toast({ title: "Conexión exitosa", description: "La sesión está activa. Ya puedes explorar el esquema." });
+      setCs("");
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Error de conexión", description: err.message });
+    }
+  };
+  
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-8 bg-card border rounded-lg">
+      <div className="flex flex-col items-center justify-center text-center max-w-lg w-full px-8">
+        <DatabaseZap className="h-16 w-16 text-primary mb-4" />
+        <h2 className="text-2xl font-bold">Bienvenido a DB Refactor Toolkit</h2>
+        <p className="text-muted-foreground mt-2">
+          Para empezar, pega tu cadena de conexión a la base de datos y establece una sesión segura.
+        </p>
+        <div className="w-full space-y-4 mt-8">
+          <Textarea
+            id="connection-string"
+            value={cs}
+            onChange={(e) => setCs(e.target.value)}
+            placeholder="Pega aquí tu cadena de conexión..."
+            className="w-full h-32 p-4 rounded-lg border font-mono text-sm bg-background"
+            autoComplete="off"
+            spellCheck={false}
+            name={name}
+            data-lpignore="true"
+            data-1p-ignore="true"
+          />
+          <Button
+            onClick={onConnect}
+            disabled={loading || !cs.trim()}
+            className="w-full text-base py-6"
+          >
+            {loading ? <Loader2 className="animate-spin" /> : <Link2 />}
+            Conectar de forma segura
+          </Button>
+          {error && (
+            <p className="mt-2 px-2 text-sm text-destructive">{error}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 export default function RefactorPage() {
   const context = useContext(DbSessionContext);
@@ -234,21 +280,7 @@ export default function RefactorPage() {
   );
 
   const MainContent = () => {
-    if (!sessionId) {
-        return (
-            <div className="flex flex-col items-center justify-center h-full gap-8">
-                <div className="flex flex-col items-center justify-center text-center">
-                    <DatabaseZap className="h-16 w-16 text-primary mb-4" />
-                    <h2 className="text-2xl font-bold">Bienvenido a DB Refactor</h2>
-                    <p className="text-muted-foreground mt-2 max-w-md">
-                        Para empezar, conecta una base de datos desde el panel lateral.
-                    </p>
-                </div>
-            </div>
-        );
-    }
-
-    return (
+      return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
             <div className="lg:col-span-1 flex flex-col gap-6">
                 <Card>
@@ -309,42 +341,50 @@ export default function RefactorPage() {
       </Sidebar>
       <SidebarInset>
         <main className="flex-grow p-4 sm:p-6 lg:p-8 h-screen flex flex-col">
-            <header className="flex items-center justify-between mb-6">
-                <Card className="flex-1 mr-4">
-                    <CardContent className="p-2">
-                        <Input placeholder="Describe tu plan de refactorización o edita el esquema directamente..." className="border-none focus-visible:ring-0 text-base" />
-                    </CardContent>
-                </Card>
-                 <div className="flex items-center gap-2">
-                    <Button onClick={() => handleRefactor(true)} disabled={loading === 'apply' || !sessionId || plan.renames.length === 0} className="bg-destructive hover:bg-destructive/90">
-                        <Play className="mr-2"/>
-                        Aplicar Cambios
-                    </Button>
-                    <Button variant="outline" onClick={triggerCleanup} disabled={loading === 'cleanup' || !sessionId || plan.renames.length === 0}>
-                        <Trash2 className="mr-2"/>
-                        Limpieza
-                    </Button>
-                </div>
-            </header>
-             <div className="bg-muted/30 p-2 rounded-lg mb-6">
-                <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleRefactor(false)} disabled={loading === 'preview' || !sessionId || plan.renames.length === 0}>
-                          {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
-                          Vista Previa DB
-                      </Button>
-                       <Button variant="outline" size="sm" onClick={handlePlan} disabled={loading === 'plan' || !sessionId || plan.renames.length === 0}>
-                          {loading === 'plan' ? <Loader2 className="animate-spin" /> : <FileText/>}
-                          Generar SQL
-                      </Button>
-                       <Button variant="outline" size="sm" onClick={() => handleCodefix(false)} disabled={loading === 'codefix' || !sessionId || plan.renames.length === 0}>
-                          {loading === 'codefix' ? <Loader2 className="animate-spin" /> : <FileCode/>}
-                          Vista Previa Código
-                      </Button>
+            {sessionId ? (
+              <>
+                <header className="flex items-center justify-between mb-6">
+                    <Card className="flex-1 mr-4">
+                        <CardContent className="p-2">
+                            <Input placeholder="Describe tu plan de refactorización o edita el esquema directamente..." className="border-none focus-visible:ring-0 text-base" />
+                        </CardContent>
+                    </Card>
+                     <div className="flex items-center gap-2">
+                        <Button onClick={() => handleRefactor(true)} disabled={loading === 'apply' || !sessionId || plan.renames.length === 0} className="bg-destructive hover:bg-destructive/90">
+                            <Play className="mr-2"/>
+                            Aplicar Cambios
+                        </Button>
+                        <Button variant="outline" onClick={triggerCleanup} disabled={loading === 'cleanup' || !sessionId || plan.renames.length === 0}>
+                            <Trash2 className="mr-2"/>
+                            Limpieza
+                        </Button>
+                    </div>
+                </header>
+                 <div className="bg-muted/30 p-2 rounded-lg mb-6">
+                    <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleRefactor(false)} disabled={loading === 'preview' || !sessionId || plan.renames.length === 0}>
+                              {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
+                              Vista Previa DB
+                          </Button>
+                           <Button variant="outline" size="sm" onClick={handlePlan} disabled={loading === 'plan' || !sessionId || plan.renames.length === 0}>
+                              {loading === 'plan' ? <Loader2 className="animate-spin" /> : <FileText/>}
+                              Generar SQL
+                          </Button>
+                           <Button variant="outline" size="sm" onClick={() => handleCodefix(false)} disabled={loading === 'codefix' || !sessionId || plan.renames.length === 0}>
+                              {loading === 'codefix' ? <Loader2 className="animate-spin" /> : <FileCode/>}
+                              Vista Previa Código
+                          </Button>
+                     </div>
                  </div>
-             </div>
-            <div className="flex-1 min-h-0">
-                <MainContent />
-            </div>
+                <div className="flex-1 min-h-0">
+                    <MainContent />
+                </div>
+              </>
+            ) : (
+                <div className="flex-1 min-h-0">
+                    <ConnectionView />
+                </div>
+            )}
         </main>
       </SidebarInset>
       
@@ -378,5 +418,3 @@ export default function RefactorPage() {
     </div>
   );
 }
-
-    
