@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useContext, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useDbSession } from "@/hooks/useDbSession";
 import { analyzeSchema, runRefactor } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -17,9 +17,8 @@ import {
   Search,
   PlusCircle,
   XCircle,
-  Power,
-  CheckCircle,
   Settings,
+  CheckCircle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -280,7 +279,7 @@ export default function SchemaPage() {
     const [loadingSchema, setLoadingSchema] = useState(true);
     const { toast } = useToast();
 
-    const handleAnalyze = React.useCallback(async () => {
+    const handleAnalyze = useCallback(async () => {
         if (!sessionId) {
           return;
         }
@@ -304,6 +303,8 @@ export default function SchemaPage() {
     useEffect(() => {
         if (sessionId) {
             handleAnalyze();
+        } else {
+            setLoadingSchema(false);
         }
     }, [sessionId, handleAnalyze]);
 
@@ -333,15 +334,41 @@ export default function SchemaPage() {
 
     if (!sessionId && !sessionLoading) {
         return (
-            <div className="flex h-screen w-full items-center justify-center">
-                <div className="text-center">
-                    <Database className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <h2 className="mt-4 text-xl font-semibold">No conectado</h2>
-                    <p className="mt-2 text-muted-foreground">Por favor, vuelve al inicio y conéctate a una base de datos para explorar el esquema.</p>
-                    <Link href="/" passHref>
-                        <Button className="mt-4">Volver al Inicio</Button>
-                    </Link>
-                </div>
+            <div className="flex min-h-screen bg-background text-foreground font-sans">
+                 <Sidebar>
+                    <SidebarHeader>
+                        <Logo />
+                    </SidebarHeader>
+                    <SidebarContent>
+                        <SidebarMenu>
+                            <SidebarMenuItem>
+                                <Link href="/" asChild>
+                                    <SidebarMenuButton><Wand2 />Refactorizar</SidebarMenuButton>
+                                </Link>
+                            </SidebarMenuItem>
+                            <SidebarMenuItem>
+                                <SidebarMenuButton isActive><Database />Esquema</SidebarMenuButton>
+                            </SidebarMenuItem>
+                            <SidebarMenuItem>
+                                <SidebarMenuButton><Settings />Ajustes</SidebarMenuButton>
+                            </SidebarMenuItem>
+                        </SidebarMenu>
+                    </SidebarContent>
+                </Sidebar>
+                <SidebarInset>
+                     <main className="flex-grow p-4 sm:p-6 lg:p-8 h-screen flex flex-col">
+                        <div className="flex h-full w-full items-center justify-center">
+                            <div className="text-center">
+                                <Database className="mx-auto h-12 w-12 text-muted-foreground" />
+                                <h2 className="mt-4 text-xl font-semibold">No conectado</h2>
+                                <p className="mt-2 text-muted-foreground">Por favor, vuelve al inicio y conéctate a una base de datos para explorar el esquema.</p>
+                                <Button className="mt-4" asChild>
+                                    <Link href="/">Volver al Inicio</Link>
+                                </Button>
+                            </div>
+                        </div>
+                    </main>
+                </SidebarInset>
             </div>
         );
     }
@@ -382,8 +409,8 @@ export default function SchemaPage() {
                 <main className="flex-grow p-4 sm:p-6 lg:p-8 h-screen flex flex-col">
                     <header className="flex items-center justify-between mb-6">
                         <h1 className="text-2xl font-bold">Explorador de Esquema</h1>
-                         <Button onClick={handleApply} disabled={plan.renames.length === 0} className="bg-destructive hover:bg-destructive/90">
-                            <Play className="mr-2" />
+                         <Button onClick={handleApply} disabled={plan.renames.length === 0}>
+                            <Play className="mr-2 h-4 w-4" />
                             Aplicar Plan
                         </Button>
                     </header>

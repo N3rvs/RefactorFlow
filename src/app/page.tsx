@@ -219,7 +219,7 @@ function SchemaSummary({ onAnalyze, loading }: { onAnalyze: () => void, loading:
                         ))}
                     </TableBody>
                 </UiTable>
-                 <Button variant="ghost" size="sm" className="w-full mt-2 text-muted-foreground">
+                 <Button variant="link" size="sm" asChild className="w-full mt-2 text-muted-foreground">
                     <Link href="/schema" className="flex items-center">
                         <Eye className="mr-2 h-4 w-4"/> Ver esquema completo
                     </Link>
@@ -477,7 +477,7 @@ export default function RefactorPage() {
                 </div>
 
                 {/* Columna Derecha */}
-                <div className="lg:col-span-2 flex flex-col gap-6">
+                <div className="lg:col-span-2 flex flex-col gap-6 h-full">
                     <PlanManager plan={plan} setPlan={setPlan}/>
                     
                     <div className="flex items-center gap-2">
@@ -499,8 +499,7 @@ export default function RefactorPage() {
                         </Button>
                     </div>
 
-
-                    <div className="grid grid-cols-2 gap-6 flex-1">
+                    <div className="grid grid-cols-2 gap-6 flex-1 min-h-0">
                         <div className="flex flex-col">
                            <ResultsPanel result={result} loading={!!loading} error={result?.error || null} />
                         </div>
