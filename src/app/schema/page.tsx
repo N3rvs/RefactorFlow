@@ -362,7 +362,7 @@ export default function SchemaPage() {
                 <SidebarContent>
                      <SidebarMenu>
                         <SidebarMenuItem>
-                            <Link href="/" passHref legacyBehavior>
+                            <Link href="/" passHref asChild>
                                 <SidebarMenuButton>
                                     <Wand2 />
                                     Refactorizar
@@ -421,5 +421,3 @@ export default function SchemaPage() {
         </div>
     );
 }
-
-    
