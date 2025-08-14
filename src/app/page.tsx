@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -17,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Separator } from "@/components/ui/separator";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import {
   Wand2,
@@ -411,7 +413,7 @@ export default function RefactorPage() {
 
   const triggerCleanup = () => {
     const hasDestructiveOps = plan.renames.some(op => op.scope.startsWith('drop'));
-    if (hasDestructiveOps) {
+    if (hasDestructiveOps || options.allowDestructive) {
       setCleanupAlertOpen(true);
     } else {
       handleCleanup();
@@ -604,21 +606,40 @@ export default function RefactorPage() {
                       <CardTitle className="text-base font-medium">Options</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                      <TooltipProvider>
                         <div className="flex items-center justify-between">
                             <Label htmlFor="use-synonyms" className="text-sm font-light flex items-center gap-2">
                                 Use Synonyms
+                                <Tooltip>
+                                  <TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground cursor-help" /></TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="max-w-xs">Crea sinónimos para los objetos renombrados, permitiendo que el código antiguo siga funcionando temporalmente.</p>
+                                  </TooltipContent>
+                                </Tooltip>
                             </Label>
                             <Switch id="use-synonyms" checked={options.useSynonyms} onCheckedChange={(checked) => setOptions(prev => ({...prev, useSynonyms: checked}))} />
                         </div>
                         <div className="flex items-center justify-between">
                              <Label htmlFor="use-views" className="text-sm font-light flex items-center gap-2">
                                 Use Views
+                                 <Tooltip>
+                                  <TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground cursor-help" /></TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="max-w-xs">Crea vistas de solo lectura para las tablas antiguas, asegurando la compatibilidad con aplicaciones que solo leen datos.</p>
+                                  </TooltipContent>
+                                </Tooltip>
                             </Label>
                             <Switch id="use-views" checked={options.useViews} onCheckedChange={(checked) => setOptions(prev => ({...prev, useViews: checked}))} />
                         </div>
                         <div className="flex items-center justify-between">
                              <Label htmlFor="cqrs" className="text-sm font-light flex items-center gap-2">
                                 CORS
+                                 <Tooltip>
+                                  <TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground cursor-help" /></TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="max-w-xs">Habilita la compatibilidad con CQRS (Command Query Responsibility Segregation) creando vistas para lectura.</p>
+                                  </TooltipContent>
+                                </Tooltip>
                              </Label>
                              <Switch id="cqrs" checked={options.cqrs} onCheckedChange={(checked) => setOptions(prev => ({...prev, cqrs: checked}))} />
                         </div>
@@ -626,9 +647,16 @@ export default function RefactorPage() {
                              <Label htmlFor="allowDestructive" className="text-sm font-light flex items-center gap-2 text-destructive">
                                 <AlertTriangle className="h-4 w-4" />
                                 Allow Destructive
+                                 <Tooltip>
+                                  <TooltipTrigger asChild><Info className="h-3 w-3 text-destructive cursor-help" /></TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="max-w-xs">Permite la ejecución de operaciones destructivas como DROP TABLE y DROP COLUMN. Usar con precaución.</p>
+                                  </TooltipContent>
+                                </Tooltip>
                             </Label>
                              <Switch id="allowDestructive" checked={options.allowDestructive} onCheckedChange={(checked) => setOptions(prev => ({...prev, allowDestructive: checked}))} />
                         </div>
+                        </TooltipProvider>
                         <p className="text-xs text-muted-foreground pt-2">Read-only views and synonyms allow legacy client code to work without immediate changes.</p>
                     </CardContent>
                 </Card>
@@ -861,3 +889,5 @@ export default function RefactorPage() {
     </div>
   );
 }
+
+    
