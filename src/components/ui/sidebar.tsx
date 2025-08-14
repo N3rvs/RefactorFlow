@@ -328,40 +328,31 @@ const sidebarMenuButtonVariants = cva(
   }
 )
 
-const SidebarMenuButton = React.forwardRef<
-  HTMLButtonElement,
-  React.ButtonHTMLAttributes<HTMLButtonElement> & {
-    asChild?: boolean
-    isActive?: boolean
-    tooltip?: string | React.ComponentProps<typeof TooltipContent>
-  } & VariantProps<typeof sidebarMenuButtonVariants>
->(
-  (
-    {
-      asChild = false,
-      isActive = false,
-      size = "default",
-      tooltip,
-      className,
-      children,
-      ...props
-    },
-    ref
-  ) => {
-    const Comp = asChild ? Slot : "button"
-    const { isMobile, state } = useSidebar()
-    
-    const buttonProps = {
-      "data-sidebar": "menu-button",
-      "data-size": size,
-      "data-active": isActive,
-      className: cn(sidebarMenuButtonVariants({ size, className }), "group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:px-2"),
-      ...props,
-    }
+type SidebarMenuButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  asChild?: boolean;
+  isActive?: boolean;
+  tooltip?: string | React.ComponentProps<typeof TooltipContent>;
+} & VariantProps<typeof sidebarMenuButtonVariants>;
 
-    const buttonContent = (
-      <>
-        {React.Children.map(children, (child, i) => {
+
+const SidebarMenuButton = React.forwardRef<HTMLButtonElement, SidebarMenuButtonProps>(
+  ({ asChild, isActive, size, tooltip, className, ...props }, ref) => {
+    const { isMobile, state } = useSidebar();
+    const Comp = asChild ? Slot : "button";
+
+    const button = (
+      <Comp
+        ref={ref}
+        data-sidebar="menu-button"
+        data-size={size}
+        data-active={isActive}
+        className={cn(
+          sidebarMenuButtonVariants({ size, className }),
+          "group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:px-2"
+        )}
+        {...props}
+      >
+        {React.Children.map(props.children, (child, i) => {
           if (React.isValidElement(child) && typeof child.type !== 'string') {
             return React.cloneElement(child as React.ReactElement<any>, {
               className: cn(child.props.className, "shrink-0 h-5 w-5"),
@@ -372,23 +363,17 @@ const SidebarMenuButton = React.forwardRef<
           }
           return child;
         })}
-      </>
+      </Comp>
     );
 
-    const button = (
-      <Comp ref={ref} {...buttonProps}>
-        {buttonContent}
-      </Comp>
-    )
-
     if (!tooltip) {
-      return button
+      return button;
     }
 
     if (typeof tooltip === "string") {
       tooltip = {
         children: tooltip,
-      }
+      };
     }
 
     return (
@@ -401,9 +386,10 @@ const SidebarMenuButton = React.forwardRef<
           {...tooltip}
         />
       </Tooltip>
-    )
+    );
   }
-)
+);
+
 SidebarMenuButton.displayName = "SidebarMenuButton"
 
 export {

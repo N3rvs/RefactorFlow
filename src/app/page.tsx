@@ -143,36 +143,42 @@ function OptionsManager({ options, setOptions }: { options: { useSynonyms: boole
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Label htmlFor="use-synonyms" className="text-sm">Usar Sinónimos</Label>
+                         <TooltipProvider>
                          <Tooltip>
                             <TooltipTrigger><Info className="h-4 w-4 text-muted-foreground"/></TooltipTrigger>
                             <TooltipContent>
                                 <p className="max-w-xs">Crea sinónimos para los objetos renombrados, manteniendo la compatibilidad con el código antiguo.</p>
                             </TooltipContent>
                         </Tooltip>
+                         </TooltipProvider>
                     </div>
                     <Switch id="use-synonyms" checked={options.useSynonyms} onCheckedChange={(c) => setOptions((p: any) => ({...p, useSynonyms: c}))} />
                 </div>
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                        <Label htmlFor="use-views" className="text-sm">Usar Vistas</Label>
+                        <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger><Info className="h-4 w-4 text-muted-foreground"/></TooltipTrigger>
                             <TooltipContent>
                                 <p className="max-w-xs">Genera vistas para los nombres de tablas y columnas antiguos como una capa de compatibilidad adicional.</p>
                             </TooltipContent>
                         </Tooltip>
+                        </TooltipProvider>
                     </div>
                     <Switch id="use-views" checked={options.useViews} onCheckedChange={(c) => setOptions((p: any) => ({...p, useViews: c}))} />
                 </div>
                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Label htmlFor="cqrs" className="text-sm">CORS</Label>
+                         <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger><Info className="h-4 w-4 text-muted-foreground"/></TooltipTrigger>
                             <TooltipContent>
                                 <p className="max-w-xs">Permite o deniega las solicitudes de diferentes orígenes al backend (Cross-Origin Resource Sharing).</p>
                             </TooltipContent>
                         </Tooltip>
+                         </TooltipProvider>
                     </div>
                     <Switch id="cqrs" checked={options.cqrs} onCheckedChange={(c) => setOptions((p: any) => ({...p, cqrs: c}))} />
                 </div>
