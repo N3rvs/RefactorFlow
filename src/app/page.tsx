@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import type { RefactorPlan, RefactorResponse, CleanupRequest, RefactorRequest, SchemaResponse, RenameOperation, PlanRequest } from "@/lib/types";
+import type { RefactorPlan, RefactorResponse, CleanupRequest, RefactorRequest, SchemaResponse, RenameOperation, PlanRequest, Table } from "@/lib/types";
 import { runRefactor, runCleanup, analyzeSchema, generatePlan, runCodeFix } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import Link from 'next/link';
@@ -148,6 +148,54 @@ function ConnectionCard() {
     );
 }
 
+function SchemaDisplay({ schema, loading }: { schema: SchemaResponse | null, loading: boolean }) {
+    if (loading) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-base font-medium">Esquema de la Base de Datos</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                    <div className="h-8 rounded-md bg-muted animate-pulse" />
+                    <div className="h-8 rounded-md bg-muted animate-pulse" />
+                    <div className="h-8 rounded-md bg-muted animate-pulse" />
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!schema || !schema.tables || schema.tables.length === 0) {
+        return null; // No mostrar nada si no hay esquema
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-base font-medium">Esquema de la Base de Datos</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <Accordion type="multiple" className="w-full max-h-96 overflow-y-auto pr-2">
+                    {schema.tables.map((table: Table) => (
+                        <AccordionItem value={table.name} key={table.name}>
+                            <AccordionTrigger>{table.name}</AccordionTrigger>
+                            <AccordionContent className="pl-4">
+                                <div className="space-y-1">
+                                    {table.columns.map(col => (
+                                        <div key={col.name} className="flex justify-between items-center text-xs">
+                                            <span className="font-mono text-muted-foreground">{col.name}</span>
+                                            <span className="font-mono text-sky-400">{col.sqlType}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
+                    ))}
+                </Accordion>
+            </CardContent>
+        </Card>
+    );
+}
+
 
 export default function RefactorPage() {
   const { sessionId, loading: sessionLoading } = useDbSession();
@@ -190,7 +238,7 @@ export default function RefactorPage() {
       toast({ variant: "destructive", title: "La sesión no está activa." });
       return;
     }
-     if (plan.renames.length === 0 && !['analyze', 'codefix', 'plan', 'preview', 'apply', 'cleanup'].includes(loadingState)) {
+     if (plan.renames.length === 0 && !['analyze', 'plan', 'preview', 'apply', 'cleanup'].includes(loadingState)) {
       toast({ variant: "destructive", title: "El plan de refactorización no puede estar vacío." });
       return;
     }
@@ -354,7 +402,7 @@ export default function RefactorPage() {
     if (sessionId && !schema) {
       handleAnalyze();
     }
-  }, [sessionId, schema]);
+  }, [sessionId]);
   
   useEffect(() => {
     if (result && result.error) {
@@ -491,6 +539,7 @@ export default function RefactorPage() {
                         <p className="text-xs text-muted-foreground pt-2">Las vistas de solo lectura y los sinónimos permiten que el código cliente heredado funcione sin cambios inmediatos.</p>
                     </CardContent>
                 </Card>
+                <SchemaDisplay schema={schema} loading={loading === 'analyze'} />
                 <Card>
                     <CardHeader>
                       <CardTitle className="text-base font-medium">Limpieza</CardTitle>
@@ -713,5 +762,3 @@ export default function RefactorPage() {
     </div>
   );
 }
-
-    
