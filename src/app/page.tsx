@@ -1,14 +1,14 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef, useContext } from "react";
-import type { RefactorPlan, RefactorResponse, CleanupRequest, RefactorRequest, SchemaResponse, RenameOperation, PlanRequest, Table } from "@/lib/types";
+import React, { useState, useEffect, useRef, useContext, useMemo } from "react";
+import type { RefactorPlan, RefactorResponse, SchemaResponse, RenameOperation, Table, Column } from "@/lib/types";
 import { runRefactor, runCleanup, analyzeSchema, generatePlan, runCodeFix } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import Link from 'next/link';
 
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger } from "@/components/ui/sidebar";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -23,8 +23,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import {
   Wand2,
   History,
-  LayoutGrid,
-  Settings,
   Loader2,
   CheckCircle,
   AlertTriangle,
@@ -32,10 +30,6 @@ import {
   Power,
   FileText,
   Trash2,
-  BrainCircuit,
-  Globe,
-  Menu,
-  ChevronRight,
   Database,
   Info,
   PlusCircle,
@@ -43,17 +37,14 @@ import {
   Eye,
   FileCode,
   Box,
-  SlidersHorizontal,
   Pencil,
-  Sparkles,
   Play,
   KeyRound,
   Link2,
-  FolderGit2,
+  Search,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import ResultsPanel from "@/components/refactor/ResultsPanel";
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { useDbSession, DbSessionContext } from "@/hooks/useDbSession";
 
@@ -61,89 +52,60 @@ const initialPlan: RefactorPlan = {
   renames: [],
 };
 
-const initialNewRename: Partial<RenameOperation> = {
-  scope: "table",
-  tableFrom: "",
-  tableTo: "",
-};
-
-
 function ConnectionCard() {
     const context = useContext(DbSessionContext);
     if (!context) throw new Error("ConnectionCard must be used within a DbSessionProvider");
     
-    const { sessionId, connect, disconnect, expiresAt, loading, error } = context;
+    const { sessionId, connect, disconnect, loading, error } = context;
     const [cs, setCs] = useState("");
     const [textareaName, setTextareaName] = useState("connection-string-ssr");
     const { toast } = useToast();
 
     useEffect(() => {
-        // This should only run on the client to avoid hydration mismatch
         setTextareaName(`cs_${Math.random().toString(36).slice(2)}`);
     }, []);
 
     const onConnect = async () => {
         if (!cs.trim()) return;
         try {
-            await connect(cs.trim(), 3600); // 1 hour
-            setCs(""); // Clear immediately
-            toast({ title: "Conexión exitosa", description: "La sesión está activa." });
+            await connect(cs.trim(), 3600);
+            setCs(""); 
+            toast({ title: "Conexión exitosa", description: "La sesión está activa. Analizando esquema..." });
         } catch (err: any) {
             toast({ variant: "destructive", title: "Error de conexión", description: err.message });
         }
     };
-
-    const onDisconnect = async () => {
-        await disconnect();
-        toast({ title: "Desconectado", description: "La sesión ha terminado." });
-    };
-
+    
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="font-medium text-base">Conexión</CardTitle>
+                <CardTitle className="font-medium text-base flex items-center gap-2">
+                    <Database className="h-4 w-4" />
+                    Conexión a la Base de Datos
+                </CardTitle>
             </CardHeader>
             <CardContent>
-                {!sessionId ? (
-                    <div className="space-y-2">
-                        <Label htmlFor="connection-string" className="text-xs text-muted-foreground">
-                            Cadena de Conexión (efímera, no se guarda)
-                        </Label>
-                        <Textarea
-                            id="connection-string"
-                            value={cs}
-                            onChange={(e) => setCs(e.target.value)}
-                            placeholder="Pega aquí tu cadena de conexión"
-                            className="w-full h-24 p-2 rounded border font-mono text-sm"
-                            autoComplete="off"
-                            spellCheck={false}
-                            name={textareaName}
-                            data-lpignore="true" data-1p-ignore="true"
-                        />
-                        <Button onClick={onConnect} disabled={loading || !cs.trim()} className="w-full">
-                            {loading ? <Loader2 className="animate-spin" /> : <Link2 />}
-                            Conectar
-                        </Button>
-                    </div>
-                ) : (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-2 text-green-400">
-                             <CheckCircle className="h-4 w-4" />
-                             <span>Conectado</span>
-                          </div>
-                          <Button onClick={onDisconnect} variant="ghost" size="sm" disabled={loading}>
-                            {loading ? <Loader2 className="animate-spin h-3 w-3" /> : "Desconectar"}
-                          </Button>
-                      </div>
-                       {expiresAt && (
-                            <p className="text-xs text-muted-foreground">
-                                La sesión expira a las {new Date(expiresAt).toLocaleTimeString()}
-                            </p>
-                        )}
-                    </div>
-                )}
-                {error && !sessionId && (
+                <div className="space-y-2">
+                    <Label htmlFor="connection-string" className="text-xs text-muted-foreground">
+                        Cadena de Conexión (se usa una vez para crear una sesión efímera)
+                    </Label>
+                    <Textarea
+                        id="connection-string"
+                        value={cs}
+                        onChange={(e) => setCs(e.target.value)}
+                        placeholder="Pega aquí tu cadena de conexión"
+                        className="w-full h-24 p-2 rounded border font-mono text-sm"
+                        autoComplete="off"
+                        spellCheck={false}
+                        name={textareaName}
+                        data-lpignore="true" data-1p-ignore="true"
+                    />
+                    <Button onClick={onConnect} disabled={loading || !cs.trim()} className="w-full">
+                        {loading ? <Loader2 className="animate-spin" /> : <Link2 />}
+                        Conectar
+                    </Button>
+                </div>
+                {error && (
                     <p className="mt-2 text-xs text-destructive">{error}</p>
                 )}
             </CardContent>
@@ -151,63 +113,203 @@ function ConnectionCard() {
     );
 }
 
-function SchemaDisplay({ schema, loading }: { schema: SchemaResponse | null, loading: boolean }) {
-    if (loading) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-base font-medium">Esquema de la Base de Datos</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                    <div className="h-8 rounded-md bg-muted animate-pulse" />
-                    <div className="h-8 rounded-md bg-muted animate-pulse" />
-                    <div className="h-8 rounded-md bg-muted animate-pulse" />
-                </CardContent>
-            </Card>
-        );
-    }
+function SchemaEditor({ 
+    schema, 
+    loading,
+    plan,
+    onPlanChange,
+    onRefresh,
+}: { 
+    schema: SchemaResponse | null; 
+    loading: boolean;
+    plan: RefactorPlan;
+    onPlanChange: (newPlan: RefactorPlan) => void;
+    onRefresh: () => void;
+}) {
+    const [newColumns, setNewColumns] = useState<Record<string, { name: string; type: string }>>({});
+    const [searchTerm, setSearchTerm] = useState("");
 
-    if (!schema || !schema.tables || schema.tables.length === 0) {
-        return null; // No mostrar nada si no hay esquema
-    }
+    const handleTableNameChange = (originalName: string, newName: string) => {
+        if (!newName.trim() || newName === originalName) {
+            const updatedRenames = plan.renames.filter(r => !(r.scope === 'table' && r.tableFrom === originalName));
+            onPlanChange({ ...plan, renames: updatedRenames });
+            return;
+        }
+
+        const existingRenameIndex = plan.renames.findIndex(r => r.scope === 'table' && r.tableFrom === originalName);
+
+        if (existingRenameIndex > -1) {
+            const updatedRenames = [...plan.renames];
+            updatedRenames[existingRenameIndex].tableTo = newName;
+            onPlanChange({ ...plan, renames: updatedRenames });
+        } else {
+            const newRename: RenameOperation = { scope: 'table', tableFrom: originalName, tableTo: newName };
+            onPlanChange({ ...plan, renames: [...plan.renames, newRename] });
+        }
+    };
+    
+    const handleColumnNameChange = (tableName: string, originalName: string, newName: string) => {
+       if (!newName.trim() || newName === originalName) {
+            const updatedRenames = plan.renames.filter(r => !(r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === originalName));
+            onPlanChange({ ...plan, renames: updatedRenames });
+            return;
+        }
+        
+        const existingRenameIndex = plan.renames.findIndex(r => r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === originalName);
+
+        if (existingRenameIndex > -1) {
+             const updatedRenames = [...plan.renames];
+             updatedRenames[existingRenameIndex].columnTo = newName;
+             onPlanChange({ ...plan, renames: updatedRenames });
+        } else {
+            const newRename: RenameOperation = { scope: 'column', tableFrom: tableName, columnFrom: originalName, columnTo: newName };
+            onPlanChange({ ...plan, renames: [...plan.renames, newRename] });
+        }
+    };
+    
+    const handleColumnTypeChange = (tableName: string, columnName: string, newType: string, originalType: string) => {
+        const isChangingType = newType && newType !== originalType;
+
+        let updatedRenames = [...plan.renames];
+        const existingRenameIndex = updatedRenames.findIndex(r => r.scope === 'column' && r.tableFrom === tableName && r.columnFrom === columnName);
+
+        if (existingRenameIndex > -1) {
+            const existing = updatedRenames[existingRenameIndex];
+            if (isChangingType) {
+                 updatedRenames[existingRenameIndex] = { ...existing, type: newType };
+            } else {
+                 const { type, ...rest } = existing;
+                 if(Object.keys(rest).length <= 3) { // scope, tableFrom, columnFrom
+                    updatedRenames = updatedRenames.filter((_, i) => i !== existingRenameIndex);
+                 } else {
+                    updatedRenames[existingRenameIndex] = rest;
+                 }
+            }
+        } else if (isChangingType) {
+            const newRename: RenameOperation = { scope: 'column', tableFrom: tableName, columnFrom: columnName, columnTo: columnName, type: newType };
+            updatedRenames.push(newRename);
+        }
+        
+        onPlanChange({ ...plan, renames: updatedRenames });
+    };
+
+    const handleAddNewColumn = (tableName: string) => {
+        const newId = `new-${tableName}-${Date.now()}`;
+        setNewColumns(prev => ({...prev, [newId]: { name: '', type: '' }}));
+    };
+
+    const handleNewColumnChange = (id: string, field: 'name' | 'type', value: string) => {
+        setNewColumns(prev => ({ ...prev, [id]: { ...prev[id], [field]: value }}));
+    };
+    
+    const { toast } = useToast();
+
+    const confirmAddColumn = (id: string, tableName: string) => {
+        const newColumn = newColumns[id];
+        if (newColumn && newColumn.name && newColumn.type) {
+            const newRename: RenameOperation = { scope: 'add-column', tableFrom: tableName, columnTo: newColumn.name, type: newColumn.type };
+            onPlanChange({ ...plan, renames: [...plan.renames, newRename] });
+            const tempNewCols = {...newColumns};
+            delete tempNewCols[id];
+            setNewColumns(tempNewCols);
+        } else {
+            toast({ variant: 'destructive', title: "Nombre y tipo de columna son requeridos."})
+        }
+    };
+
+    const cancelAddColumn = (id: string) => {
+        const tempNewCols = {...newColumns};
+        delete tempNewCols[id];
+        setNewColumns(tempNewCols);
+    };
+    
+    const enhancedTables = useMemo(() => {
+        if (!schema?.tables) return [];
+        const tablesWithPk = schema.tables.map(table => {
+            const pkIndex = table.indexes?.find(idx => idx.isPrimary);
+            const pkColumns = pkIndex ? pkIndex.columns : [];
+            const columnsWithPk = table.columns.map(col => ({ ...col, isPrimaryKey: pkColumns.includes(col.name) }));
+            return { ...table, columns: columnsWithPk };
+        });
+        if (!searchTerm) return tablesWithPk;
+        return tablesWithPk.filter(table => table.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    }, [schema, searchTerm]);
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-base font-medium">Esquema de la Base de Datos</CardTitle>
+        <Card className="h-full flex flex-col">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <div className="flex items-center gap-2">
+                    <CardTitle className="text-base font-medium">Editor de Esquema</CardTitle>
+                </div>
+                <Button variant="ghost" size="sm" onClick={onRefresh} disabled={loading} className="text-xs">
+                    {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-2 h-3 w-3" />}
+                    Actualizar
+                </Button>
             </CardHeader>
-            <CardContent>
-                <Accordion type="multiple" className="w-full max-h-96 overflow-y-auto pr-2">
-                    {schema.tables.map((table: Table) => (
-                        <AccordionItem value={table.name} key={table.name}>
-                            <AccordionTrigger>{table.name}</AccordionTrigger>
-                            <AccordionContent className="pl-4">
-                                <div className="space-y-1">
-                                    {table.columns.map(col => (
-                                        <div key={col.name} className="flex justify-between items-center text-xs">
-                                            <span className="font-mono text-muted-foreground">{col.name}</span>
-                                            <span className="font-mono text-sky-400">{col.sqlType}</span>
+            <CardContent className="flex-1 flex flex-col">
+                <div className="relative mb-4">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Buscar tablas..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                </div>
+                {loading && (
+                    <div className="flex-1 flex items-center justify-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                )}
+                {!loading && (
+                    <div className="flex-1 overflow-y-auto pr-2">
+                        <Accordion type="multiple" className="w-full">
+                            {enhancedTables.map((table) => (
+                                <AccordionItem value={table.name} key={table.name}>
+                                    <AccordionTrigger>
+                                      <div className="flex items-center gap-2 flex-1 group mr-4">
+                                         <Pencil className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
+                                         <Input defaultValue={table.name} className="h-8 border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent" onBlur={(e) => handleTableNameChange(table.name, e.target.value)} onClick={(e) => e.stopPropagation()} />
+                                      </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="pl-6">
+                                        <div className="space-y-1">
+                                            {table.columns.map(col => (
+                                                <div key={col.name} className="flex justify-between items-center text-xs group gap-2">
+                                                    <div className="flex items-center gap-2 flex-1">
+                                                        {col.isPrimaryKey ? <KeyRound className="h-3 w-3 text-amber-400" /> : <Pencil className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />}
+                                                       <Input defaultValue={col.name} className="h-7 text-xs border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent" onBlur={(e) => handleColumnNameChange(table.name, col.name, e.target.value)} onClick={(e) => e.stopPropagation()} />
+                                                    </div>
+                                                    <Input defaultValue={col.sqlType} className="h-7 text-xs border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent font-mono text-sky-400 w-28" onBlur={(e) => handleColumnTypeChange(table.name, col.name, e.target.value, col.sqlType)} onClick={(e) => e.stopPropagation()} />
+                                                </div>
+                                            ))}
+                                             {Object.entries(newColumns).filter(([id]) => id.includes(`-${table.name}-`)).map(([id, col]) => (
+                                                <div key={id} className="flex justify-between items-center text-xs group gap-2 p-2 bg-muted/50 rounded-md">
+                                                    <div className="flex items-center gap-2 flex-1">
+                                                       <Input placeholder="nombre_columna" className="h-7 text-xs" value={col.name} onChange={(e) => handleNewColumnChange(id, 'name', e.target.value)} onClick={(e) => e.stopPropagation()} />
+                                                    </div>
+                                                    <Input placeholder="tipo_sql" className="h-7 text-xs font-mono w-28" value={col.type} onChange={(e) => handleNewColumnChange(id, 'type', e.target.value)} onClick={(e) => e.stopPropagation()} />
+                                                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => confirmAddColumn(id, table.name)}><CheckCircle className="h-4 w-4 text-green-500"/></Button>
+                                                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => cancelAddColumn(id)}><XCircle className="h-4 w-4 text-red-500"/></Button>
+                                                </div>
+                                            ))}
+                                            <Button variant="ghost" size="sm" className="w-full mt-2 text-xs" onClick={() => handleAddNewColumn(table.name)}>
+                                                <PlusCircle className="mr-2 h-3 w-3" /> Añadir Columna
+                                            </Button>
                                         </div>
-                                    ))}
-                                </div>
-                            </AccordionContent>
-                        </AccordionItem>
-                    ))}
-                </Accordion>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                    </div>
+                )}
             </CardContent>
         </Card>
     );
 }
 
-
 export default function RefactorPage() {
   const context = useContext(DbSessionContext);
   if (!context) throw new Error("RefactorPage must be used within a DbSessionProvider");
   
-  const { sessionId, loading: sessionLoading } = context;
+  const { sessionId, disconnect, loading: sessionLoading, expiresAt } = context;
 
   const [plan, setPlan] = useState<RefactorPlan>(initialPlan);
-  const [newRename, setNewRename] = useState<Partial<RenameOperation>>(initialNewRename);
   const [options, setOptions] = useState({ useSynonyms: true, useViews: true, cqrs: true, allowDestructive: false });
   const [rootKey, setRootKey] = useState("SOLUTION");
   
@@ -217,17 +319,7 @@ export default function RefactorPage() {
   
   const [isCleanupAlertOpen, setCleanupAlertOpen] = useState(false);
   const [cleanupConfirmation, setCleanupConfirmation] = useState("");
-  const cleanupButtonRef = useRef<HTMLButtonElement>(null);
-
-
-  const [activePlanTab, setActivePlanTab] = useState<'table' | 'column' | 'add-column' | 'drop-table' | 'drop-column'>('table');
-  const [newColTable, setNewColTable] = useState("");
-  const [newColName, setNewColName] = useState("");
-  const [baseType, setBaseType] = useState<'int' | 'nvarchar' | 'decimal' | 'bit' | 'date' | 'datetime2'>('nvarchar');
-  const [length, setLength] = useState<number>(50);
-  const [precision, setPrecision] = useState<number>(10);
-  const [scale, setScale] = useState<number>(2);
-
+  
   const { toast, dismiss } = useToast();
 
   const getErrorMessage = (error: unknown): string => {
@@ -241,16 +333,17 @@ export default function RefactorPage() {
     onSuccess: (data: T) => void,
     toastMessages: { loading: string; success: string; error: string }
   ) => {
-    if (!sessionId && !['codefix', 'plan'].includes(loadingState)) {
+    if (!sessionId) {
       toast({ variant: "destructive", title: "La sesión no está activa." });
       return;
     }
-     if (plan.renames.length === 0 && !['analyze', 'plan', 'preview', 'apply', 'cleanup'].includes(loadingState)) {
+     if (plan.renames.length === 0 && !['analyze', 'cleanup'].includes(loadingState)) {
       toast({ variant: "destructive", title: "El plan de refactorización no puede estar vacío." });
       return;
     }
 
     setLoading(loadingState);
+    setResult(null); // Clear previous results
     const { id } = toast({ title: toastMessages.loading, duration: 999999 });
 
     try {
@@ -262,23 +355,27 @@ export default function RefactorPage() {
       const errorMessage = getErrorMessage(err);
       dismiss(id);
       toast({ variant: "destructive", title: toastMessages.error, description: errorMessage, duration: 5000 });
+      setResult({ ok: false, error: errorMessage });
     } finally {
       setLoading(false);
     }
   };
 
   const handleAnalyze = React.useCallback(() => {
-      if (!sessionId) {
-          toast({ variant: "destructive", title: "Conéctate primero para analizar el esquema."});
-          return;
-      }
+      if (!sessionId) return;
       handleApiCall(
         () => analyzeSchema(sessionId),
         "analyze",
         (data) => setSchema(data),
         { loading: "Analizando esquema...", success: "Análisis de esquema completado.", error: "Falló el análisis de esquema." }
     );
-  }, [sessionId, toast]);
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (sessionId && !schema) {
+      handleAnalyze();
+    }
+  }, [sessionId, schema, handleAnalyze]);
 
   const handlePlan = () => handleApiCall(
     () => generatePlan({ renames: plan.renames, ...options }),
@@ -288,10 +385,6 @@ export default function RefactorPage() {
   );
 
   const handleRefactor = (apply: boolean) => {
-     if (!sessionId) {
-          toast({ variant: "destructive", title: "Conéctate primero para ejecutar la refactorización."});
-          return;
-      }
     handleApiCall(
     () => runRefactor({ sessionId, plan, apply, rootKey, ...options }),
     apply ? "apply" : "preview",
@@ -314,10 +407,6 @@ export default function RefactorPage() {
   };
   
   const handleCleanup = () => {
-    if (!sessionId) {
-        toast({ variant: "destructive", title: "Conéctate primero para ejecutar la limpieza."});
-        return;
-    }
     handleApiCall(
         () => runCleanup({ sessionId, renames: plan.renames, ...options }),
         "cleanup",
@@ -341,86 +430,72 @@ export default function RefactorPage() {
     }
   );
 
-  function buildSqlType(): string {
-    if (baseType === "nvarchar") return `nvarchar(${length || 50})`;
-    if (baseType === "decimal") return `decimal(${precision || 10}, ${scale || 2})`;
-    return baseType;
-  }
-  
-  const handleAddManualRename = () => {
-    let newOp: RenameOperation | null = null;
-  
-    switch(activePlanTab) {
-        case 'table':
-             if (!newRename.tableFrom || !newRename.tableTo) {
-                toast({ variant: "destructive", title: "Los campos 'Tabla Desde' y 'Tabla Hasta' son obligatorios." });
-                return;
-              }
-              newOp = { ...newRename, scope: 'table' } as RenameOperation;
-              break;
-        case 'column':
-             if (!newRename.tableFrom || !newRename.columnFrom || !newRename.columnTo) {
-                toast({ variant: "destructive", title: "Los campos 'Tabla Desde', 'Columna Desde' y 'Columna Hasta' son obligatorios." });
-                return;
-              }
-              newOp = { ...newRename, scope: 'column' } as RenameOperation;
-              break;
-        case 'add-column':
-             if (!newColTable.trim() || !newColName.trim()) {
-                toast({ variant: "destructive", title: "Los campos 'Tabla' y 'Nombre de Columna' son obligatorios." });
-                return;
-              }
-              newOp = {
-                scope: 'add-column',
-                tableFrom: newColTable.trim(),
-                columnTo: newColName.trim(),
-                type: buildSqlType(),
-              };
-              break;
-        case 'drop-table':
-            if (!newRename.tableFrom) {
-                toast({ variant: "destructive", title: "El campo 'Tabla Desde' es obligatorio." });
-                return;
-            }
-            newOp = { scope: 'drop-table', tableFrom: newRename.tableFrom };
-            break;
-        case 'drop-column':
-             if (!newRename.tableFrom || !newRename.columnFrom) {
-                toast({ variant: "destructive", title: "Los campos 'Tabla Desde' y 'Columna Desde' son obligatorios." });
-                return;
-            }
-            newOp = { scope: 'drop-column', tableFrom: newRename.tableFrom, columnFrom: newRename.columnFrom };
-            break;
-    }
-  
-    if (newOp) {
-      setPlan(prev => ({ ...prev, renames: [...prev.renames, newOp as RenameOperation] }));
-      setNewRename({ scope: activePlanTab });
-      setNewColTable("");
-      setNewColName("");
-    }
-  };
-  
   const removeRename = (index: number) => {
     setPlan(prev => ({ ...prev, renames: prev.renames.filter((_, i) => i !== index) }));
   };
-
-  useEffect(() => {
-    if (sessionId && !schema) {
-      handleAnalyze();
-    }
-  }, [sessionId, schema, handleAnalyze]);
   
-  useEffect(() => {
-    if (result && result.error) {
-        toast({
-            title: `Operación fallida`,
-            description: getErrorMessage(result.error),
-            variant: "destructive",
-            duration: 5000
-        })
+  const MainContent = () => {
+    if (!sessionId) {
+        return (
+            <div className="w-full max-w-md mx-auto mt-20">
+                <ConnectionCard />
+            </div>
+        );
     }
-  }, [result, toast]);
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 h-full">
+            <div className="lg:col-span-3 h-full">
+                <SchemaEditor 
+                    schema={schema} 
+                    loading={loading === 'analyze' || sessionLoading && !schema} 
+                    plan={plan} 
+                    onPlanChange={setPlan}
+                    onRefresh={handleAnalyze}
+                />
+            </div>
+            <div className="lg:col-span-2 flex flex-col gap-6">
+                 <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base font-medium">Plan de Refactorización</CardTitle>
+                      <CardContent className="space-y-2 pt-4">
+                          {plan.renames.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-4">Edita el esquema para añadir cambios al plan.</p>
+                          ) : (
+                            <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                              {plan.renames.map((op, index) => {
+                                const isDestructive = op.scope.startsWith('drop');
+                                return (
+                                    <div key={index} className={cn("flex items-center justify-between bg-muted/50 p-2 rounded-md", isDestructive && "bg-destructive/10")}>
+                                        <div className="text-xs">
+                                            <Badge variant={isDestructive ? "destructive" : "outline"} className="mr-2">{op.scope}</Badge>
+                                            <span className="font-mono">{
+                                                op.scope === 'table' ? `${op.tableFrom} -> ${op.tableTo}` : 
+                                                op.scope === 'add-column' ? `ADD ${op.columnTo}(${op.type}) TO ${op.tableFrom}` :
+                                                op.scope === 'drop-table' ? op.tableFrom :
+                                                op.scope === 'drop-column' ? `${op.tableFrom}.${op.columnFrom}` :
+                                                `${op.tableFrom}.${op.columnFrom} -> ${op.columnTo || ''}${op.type ? ` (${op.type})` : ''}`
+                                            }</span>
+                                        </div>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeRename(index)}>
+                                            <XCircle className="h-4 w-4 text-muted-foreground" />
+                                        </Button>
+                                    </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                      </CardContent>
+                    </CardHeader>
+                </Card>
+
+                <ResultsPanel result={result} loading={!!loading && loading !== 'analyze'} error={result?.error || null} />
+
+            </div>
+        </div>
+    );
+  };
+
 
   return (
     <div className="flex min-h-screen bg-background text-foreground font-sans">
@@ -431,310 +506,72 @@ export default function RefactorPage() {
           <SidebarContent>
               <SidebarMenu>
                   <SidebarMenuItem>
-                    <Link href="/" className="w-full">
                       <SidebarMenuButton isActive>
                           <Wand2 />
                           Refactorizar
                       </SidebarMenuButton>
-                    </Link>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                      <SidebarMenuButton disabled>
-                          <History />
-                          Historial
-                      </SidebarMenuButton>
-                  </SidebarMenuItem>
-                   <SidebarMenuItem>
-                    <Link href="/schema" className="w-full">
-                      <SidebarMenuButton>
-                          <Box />
-                          Esquema
-                      </SidebarMenuButton>
-                    </Link>
                   </SidebarMenuItem>
               </SidebarMenu>
           </SidebarContent>
           <SidebarFooter>
              <div className="p-2 border-t border-border">
-                 <Button variant={"outline"} className="w-full mt-2 justify-start gap-2" onClick={handleAnalyze} disabled={!sessionId || loading === 'analyze'}>
-                      {loading === 'analyze' ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-                      <span>Analizar Esquema</span>
-                 </Button>
+                {sessionId ? (
+                     <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm p-2">
+                          <div className="flex items-center gap-2 text-green-400">
+                             <CheckCircle className="h-4 w-4" />
+                             <span>Conectado</span>
+                          </div>
+                        </div>
+                        {expiresAt && (
+                            <p className="text-xs text-muted-foreground px-2">
+                                Expira a las {new Date(expiresAt).toLocaleTimeString()}
+                            </p>
+                        )}
+                        <Button variant="outline" className="w-full" onClick={disconnect} disabled={sessionLoading}>
+                             {sessionLoading ? <Loader2 className="animate-spin" /> : <Power />}
+                             Desconectar
+                        </Button>
+                     </div>
+                ) : (
+                    <div className="text-sm text-muted-foreground p-2">
+                        No conectado
+                    </div>
+                )}
               </div>
           </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <main className="flex-grow p-4 sm:p-6 lg:p-8">
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start h-full">
-              
-              <div className="lg:col-span-2 flex flex-col gap-6">
-                <ConnectionCard />
-                <Card>
-                    <CardHeader>
-                      <CardTitle className="font-medium text-base">Repositorio</CardTitle>
-                    </CardHeader>
-                     <CardContent>
-                        <div>
-                            <Label htmlFor="root-key" className="text-xs text-muted-foreground">Clave Raíz</Label>
-                             <Input
-                                id="root-key"
-                                placeholder="SOLUTION"
-                                value={rootKey}
-                                onChange={(e) => setRootKey(e.target.value)}
-                                className="font-mono text-sm mt-1 bg-background"
-                             />
-                             <p className="text-xs text-muted-foreground mt-2">La clave para la ruta raíz del proyecto donde aplicar los cambios de código (ej. SOLUTION, FRONTEND).</p>
-                        </div>
-                    </CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base font-medium">Opciones</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <TooltipProvider>
-                        <div className="flex items-center justify-between">
-                            <Label htmlFor="use-synonyms" className="text-sm font-light flex items-center gap-2">
-                                Usar Sinónimos
-                                <Tooltip>
-                                  <TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground cursor-help" /></TooltipTrigger>
-                                  <TooltipContent>
-                                    <p className="max-w-xs">Crea sinónimos para los objetos renombrados, permitiendo que el código antiguo siga funcionando temporalmente.</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                            </Label>
-                            <Switch id="use-synonyms" checked={options.useSynonyms} onCheckedChange={(checked) => setOptions(prev => ({...prev, useSynonyms: checked}))} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                             <Label htmlFor="use-views" className="text-sm font-light flex items-center gap-2">
-                                Usar Vistas
-                                 <Tooltip>
-                                  <TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground cursor-help" /></TooltipTrigger>
-                                  <TooltipContent>
-                                    <p className="max-w-xs">Crea vistas de solo lectura para las tablas antiguas, asegurando la compatibilidad con aplicaciones que solo leen datos.</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                            </Label>
-                            <Switch id="use-views" checked={options.useViews} onCheckedChange={(checked) => setOptions(prev => ({...prev, useViews: checked}))} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                             <Label htmlFor="cqrs" className="text-sm font-light flex items-center gap-2">
-                                CQRS
-                                 <Tooltip>
-                                  <TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground cursor-help" /></TooltipTrigger>
-                                  <TooltipContent>
-                                    <p className="max-w-xs">Habilita la compatibilidad con Command Query Responsibility Segregation (CQRS) mediante la creación de vistas para lectura.</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                             </Label>
-                             <Switch id="cqrs" checked={options.cqrs} onCheckedChange={(checked) => setOptions(prev => ({...prev, cqrs: checked}))} />
-                        </div>
-                         <div className="flex items-center justify-between pt-2 border-t border-destructive/20">
-                             <Label htmlFor="allowDestructive" className="text-sm font-light flex items-center gap-2 text-destructive">
-                                <AlertTriangle className="h-4 w-4" />
-                                Permitir Operaciones Destructivas
-                                 <Tooltip>
-                                  <TooltipTrigger asChild><Info className="h-3 w-3 text-destructive cursor-help" /></TooltipTrigger>
-                                  <TooltipContent>
-                                    <p className="max-w-xs">Permite la ejecución de operaciones destructivas como DROP TABLE y DROP COLUMN. Usar con precaución.</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                            </Label>
-                             <Switch id="allowDestructive" checked={options.allowDestructive} onCheckedChange={(checked) => setOptions(prev => ({...prev, allowDestructive: checked}))} />
-                        </div>
-                        </TooltipProvider>
-                        <p className="text-xs text-muted-foreground pt-2">Las vistas de solo lectura y los sinónimos permiten que el código cliente heredado funcione sin cambios inmediatos.</p>
-                    </CardContent>
-                </Card>
-                <SchemaDisplay schema={schema} loading={loading === 'analyze'} />
-                <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base font-medium">Limpieza</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                       <p className="text-xs text-muted-foreground pb-2">Una vez aplicados los cambios y actualizado el código, puedes eliminar los elementos de compatibilidad (vistas/sinónimos).</p>
-                       <Button ref={cleanupButtonRef} variant="secondary" className="w-full" onClick={triggerCleanup} disabled={loading === 'cleanup' || !sessionId}>
-                           {loading === 'cleanup' ? <Loader2 className="animate-spin" /> : <Trash2 />}
-                           Ejecutar Limpieza
-                        </Button>
-                    </CardContent>
-                </Card>
-
-              </div>
-
-              <div className="lg:col-span-3 flex flex-col gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base font-medium">Plan de Refactorización</CardTitle>
-                    </CardHeader>
-                     <CardContent className="space-y-4">
-                        <Accordion type="single" collapsible>
-                            <AccordionItem value="manual-add">
-                                <AccordionTrigger className="text-sm">Añadir operación manual</AccordionTrigger>
-                                <AccordionContent className="space-y-3 pt-4">
-                                     <div className="flex space-x-1 rounded-md bg-muted p-1 flex-wrap">
-                                        <button onClick={() => setActivePlanTab("table")} className={cn(buttonVariants({ variant: activePlanTab === 'table' ? 'primary': 'ghost', size: 'sm' }), 'flex-1')}>Renombrar Tabla</button>
-                                        <button onClick={() => setActivePlanTab("column")} className={cn(buttonVariants({ variant: activePlanTab === 'column' ? 'primary': 'ghost', size: 'sm' }), 'flex-1')}>Renombrar Columna</button>
-                                        <button onClick={() => setActivePlanTab("add-column")} className={cn(buttonVariants({ variant: activePlanTab === 'add-column' ? 'primary': 'ghost', size: 'sm' }), 'flex-1')}>Añadir Columna</button>
-                                        <button onClick={() => setActivePlanTab("drop-table")} className={cn(buttonVariants({ variant: activePlanTab === 'drop-table' ? 'destructive': 'ghost', size: 'sm' }), 'flex-1')}>Eliminar Tabla</button>
-                                        <button onClick={() => setActivePlanTab("drop-column")} className={cn(buttonVariants({ variant: activePlanTab === 'drop-column' ? 'destructive': 'ghost', size: 'sm' }), 'flex-1')}>Eliminar Columna</button>
-                                     </div>
-                                     <div className="pt-2">
-                                        {activePlanTab === 'table' && (
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <Label className="text-xs">Tabla Origen</Label>
-                                                    <Input value={newRename.tableFrom || ''} onChange={(e) => setNewRename(prev => ({ ...prev, tableFrom: e.target.value, scope: 'table' }))} className="h-9 text-sm" />
-                                                </div>
-                                                <div>
-                                                    <Label className="text-xs">Tabla Destino</Label>
-                                                    <Input value={newRename.tableTo || ''} onChange={(e) => setNewRename(prev => ({ ...prev, tableTo: e.target.value, scope: 'table' }))} className="h-9 text-sm" />
-                                                </div>
-                                            </div>
-                                        )}
-                                        {activePlanTab === 'column' && (
-                                            <div className="space-y-3">
-                                                <div>
-                                                    <Label className="text-xs">Tabla Origen</Label>
-                                                    <Input value={newRename.tableFrom || ''} onChange={(e) => setNewRename(prev => ({ ...prev, tableFrom: e.target.value, scope: 'column' }))} className="h-9 text-sm" />
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <div>
-                                                        <Label className="text-xs">Columna Origen</Label>
-                                                        <Input value={newRename.columnFrom || ''} onChange={(e) => setNewRename(prev => ({ ...prev, columnFrom: e.target.value, scope: 'column' }))} className="h-9 text-sm" />
-                                                    </div>
-                                                    <div>
-                                                        <Label className="text-xs">Columna Destino</Label>
-                                                        <Input value={newRename.columnTo || ''} onChange={(e) => setNewRename(prev => ({ ...prev, columnTo: e.target.value, scope: 'column' }))} className="h-9 text-sm" />
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <Label className="text-xs">Tipo (Opcional)</Label>
-                                                    <Input value={newRename.type || ''} onChange={(e) => setNewRename(prev => ({ ...prev, type: e.target.value, scope: 'column' }))} className="h-9 text-sm" />
-                                                </div>
-                                            </div>
-                                        )}
-                                        {activePlanTab === 'add-column' && (
-                                            <div className="space-y-3">
-                                                 <div>
-                                                    <Label className="text-xs">Tabla</Label>
-                                                    <Input value={newColTable} onChange={(e) => setNewColTable(e.target.value)} className="h-9 text-sm" />
-                                                 </div>
-                                                 <div>
-                                                    <Label className="text-xs">Nombre de Columna</Label>
-                                                    <Input value={newColName} onChange={(e) => setNewColName(e.target.value)} className="h-9 text-sm" />
-                                                 </div>
-                                                  <div>
-                                                    <Label className="text-xs">Tipo de Dato</Label>
-                                                    <select
-                                                        value={baseType}
-                                                        onChange={(e) => setBaseType(e.target.value as any)}
-                                                        className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
-                                                    >
-                                                        <option value="nvarchar">nvarchar</option>
-                                                        <option value="varchar">varchar</option>
-                                                        <option value="int">int</option>
-                                                        <option value="decimal">decimal</option>
-                                                        <option value="bit">bit</option>
-                                                        <option value="date">date</option>
-                                                        <option value="datetime2">datetime2</option>
-                                                    </select>
-                                                  </div>
-                                                  {baseType === 'nvarchar' && (
-                                                    <div>
-                                                        <Label className="text-xs">Longitud</Label>
-                                                        <Input type="number" value={length} onChange={(e) => setLength(Number(e.target.value))} className="h-9 text-sm" />
-                                                    </div>
-                                                  )}
-                                                  {baseType === 'decimal' && (
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <div>
-                                                            <Label className="text-xs">Precisión</Label>
-                                                            <Input type="number" value={precision} onChange={(e) => setPrecision(Number(e.target.value))} className="h-9 text-sm" />
-                                                        </div>
-                                                        <div>
-                                                           <Label className="text-xs">Escala</Label>
-                                                            <Input type="number" value={scale} onChange={(e) => setScale(Number(e.target.value))} className="h-9 text-sm" />
-                                                        </div>
-                                                    </div>
-                                                  )}
-                                            </div>
-                                        )}
-                                        {activePlanTab === 'drop-table' && (
-                                            <div>
-                                                <Label className="text-xs text-destructive">Tabla a Eliminar</Label>
-                                                <Input value={newRename.tableFrom || ''} onChange={(e) => setNewRename(prev => ({ ...prev, tableFrom: e.target.value, scope: 'drop-table' }))} className="h-9 text-sm border-destructive" />
-                                            </div>
-                                        )}
-                                        {activePlanTab === 'drop-column' && (
-                                             <div className="space-y-3">
-                                                <div>
-                                                    <Label className="text-xs text-destructive">Tabla Origen</Label>
-                                                    <Input value={newRename.tableFrom || ''} onChange={(e) => setNewRename(prev => ({ ...prev, tableFrom: e.target.value, scope: 'drop-column' }))} className="h-9 text-sm border-destructive" />
-                                                </div>
-                                                <div>
-                                                    <Label className="text-xs text-destructive">Columna a Eliminar</Label>
-                                                    <Input value={newRename.columnFrom || ''} onChange={(e) => setNewRename(prev => ({ ...prev, columnFrom: e.target.value, scope: 'drop-column' }))} className="h-9 text-sm border-destructive" />
-                                                </div>
-                                            </div>
-                                        )}
-                                     </div>
-                                    <Button size="sm" onClick={handleAddManualRename} className="w-full">Añadir al plan</Button>
-                                </AccordionContent>
-                            </AccordionItem>
-                        </Accordion>
-
-                        <Separator />
-
-                      {plan.renames.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-4">Aún no hay cambios en el plan.</p>
-                      ) : (
-                        <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                          {plan.renames.map((op, index) => {
-                            const isDestructive = op.scope.startsWith('drop');
-                            return (
-                                <div key={index} className={cn("flex items-center justify-between bg-muted/50 p-2 rounded-md", isDestructive && "bg-destructive/10")}>
-                                    <div className="text-xs">
-                                        <Badge variant={isDestructive ? "destructive" : "outline"} className="mr-2">{op.scope}</Badge>
-                                        <span className="font-mono">{
-                                            op.scope === 'table' ? `${op.tableFrom} -> ${op.tableTo}` : 
-                                            op.scope === 'add-column' ? `ADD ${op.columnTo}(${op.type}) TO ${op.tableFrom}` :
-                                            op.scope === 'drop-table' ? op.tableFrom :
-                                            op.scope === 'drop-column' ? `${op.tableFrom}.${op.columnFrom}` :
-                                            `${op.tableFrom}.${op.columnFrom} -> ${op.columnTo || op.columnFrom}${op.type ? ` (${op.type})` : ''}`
-                                        }</span>
-                                    </div>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeRename(index)}>
-                                        <XCircle className="h-4 w-4 text-muted-foreground" />
-                                    </Button>
-                                </div>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </CardContent>
-                    <CardFooter className="flex flex-wrap gap-2 pt-4 border-t">
-                      <Button variant="outline" size="sm" onClick={() => handleRefactor(false)} disabled={loading === 'preview' || plan.renames.length === 0 || !sessionId}>
+        <main className="flex-grow p-4 sm:p-6 lg:p-8 h-full">
+            <header className="flex items-center justify-between mb-6">
+                <h1 className="text-2xl font-bold">Herramienta de Refactorización de BD</h1>
+                {sessionId && (
+                    <div className="flex items-center gap-4">
+                      <Button variant="outline" onClick={() => handleRefactor(false)} disabled={loading === 'preview' || plan.renames.length === 0}>
                           {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
                           Vista Previa BD
                       </Button>
-                       <Button variant="outline" size="sm" onClick={handlePlan} disabled={loading === 'plan' || plan.renames.length === 0}>
+                       <Button variant="outline" onClick={handlePlan} disabled={loading === 'plan' || plan.renames.length === 0}>
                           {loading === 'plan' ? <Loader2 className="animate-spin" /> : <FileText/>}
                           Generar SQL
                       </Button>
-                       <Button variant="outline" size="sm" onClick={() => handleCodefix(false)} disabled={loading === 'codefix' || plan.renames.length === 0}>
+                       <Button variant="outline" onClick={() => handleCodefix(false)} disabled={loading === 'codefix' || plan.renames.length === 0}>
                           {loading === 'codefix' ? <Loader2 className="animate-spin" /> : <FileCode/>}
                           Vista Previa Código
                       </Button>
-                      <div className="flex-grow"></div>
-                      <Button variant="destructive" size="sm" onClick={() => handleRefactor(true)} disabled={loading === 'apply' || plan.renames.length === 0 || !sessionId}>
+                      <Button variant="destructive" onClick={() => handleRefactor(true)} disabled={loading === 'apply' || plan.renames.length === 0}>
                             {loading === 'apply' ? <Loader2 className="animate-spin" /> : <Play />}
                             Aplicar Cambios
                       </Button>
-                    </CardFooter>
-                </Card>
-                <ResultsPanel result={result} loading={!!loading} error={result?.error || null} />
-              </div>
+                      <Button variant="secondary" onClick={triggerCleanup} disabled={loading === 'cleanup'}>
+                           {loading === 'cleanup' ? <Loader2 className="animate-spin" /> : <Trash2 />}
+                           Limpieza
+                        </Button>
+                    </div>
+                )}
+            </header>
+            <div className="h-[calc(100%-4rem)]">
+                <MainContent />
             </div>
         </main>
       </SidebarInset>
@@ -744,7 +581,7 @@ export default function RefactorPage() {
               <AlertDialogHeader>
                   <AlertDialogTitle>¿Eliminar objetos de la base de datos?</AlertDialogTitle>
                   <AlertDialogDescription>
-                      Se van a ejecutar comandos DROP TABLE / DROP COLUMN. Esta acción es irreversible.
+                      Esta acción es irreversible y podría incluir operaciones como DROP TABLE o DROP COLUMN si están en el plan.
                       Por favor, escribe "ELIMINAR" para confirmar.
                   </AlertDialogDescription>
               </AlertDialogHeader>
