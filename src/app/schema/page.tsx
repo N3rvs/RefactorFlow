@@ -270,6 +270,7 @@ function PlanReview({ plan, onRemove }: { plan: RefactorPlan, onRemove: (index: 
 
 export default function SchemaPage() {
     const context = useDbSession();
+    if (!context) throw new Error("SchemaPage must be used within a DbSessionProvider");
     
     const { sessionId, disconnect, loading: sessionLoading } = context;
 
