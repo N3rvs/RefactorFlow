@@ -2,12 +2,12 @@
 "use client";
 
 import React, { useState, useEffect, useContext } from "react";
-import type { RefactorPlan, RefactorResponse, SchemaResponse, RenameOperation } from "@/lib/types";
+import type { RefactorPlan, RefactorResponse, SchemaResponse, RenameOperation, Table } from "@/lib/types";
 import { runRefactor, runCleanup, analyzeSchema, generatePlan, runCodeFix } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import Link from 'next/link';
 
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
+import { Sidebar, SidebarContent, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,21 +15,19 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table as UiTable, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Wand2,
   Loader2,
   CheckCircle,
-  Power,
-  FileText,
-  Trash2,
   Database,
   Eye,
   FileCode,
   Play,
   Settings,
   Pencil,
-  PlusCircle,
-  XCircle,
+  Trash2,
   FolderGit2
 } from "lucide-react";
 import { Logo } from "@/components/logo";
@@ -58,7 +56,7 @@ function ConnectionManager() {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-green-400">
                            <CheckCircle className="h-4 w-4"/>
-                           <span className="text-sm">Conectado</span>
+                           <span className="text-sm font-medium">Conectado</span>
                         </div>
                         <Button variant="ghost" size="sm" onClick={disconnect} disabled={loading}>
                            {loading ? <Loader2 className="h-4 w-4 animate-spin"/> : "Desconectar"}
@@ -79,51 +77,58 @@ function RepositoryManager() {
                 <CardTitle className="text-base font-medium">Repositorio</CardTitle>
             </CardHeader>
             <CardContent>
-                <Label htmlFor="root-key">Clave Raiz</Label>
-                <Input id="root-key" readOnly value="SOLUTION" className="mt-2 bg-input"/>
+                <Label htmlFor="root-key" className="text-muted-foreground">Clave Raiz</Label>
+                <Select defaultValue="SOLUTION" disabled>
+                    <SelectTrigger className="mt-2 bg-input border-0">
+                        <SelectValue placeholder="Seleccionar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="SOLUTION">SOLUTION</SelectItem>
+                    </SelectContent>
+                </Select>
             </CardContent>
         </Card>
     );
 }
 
-function OptionsManager({ options, setOptions }) {
+function OptionsManager({ options, setOptions }: { options: { useSynonyms: boolean, useViews: boolean, cqrs: boolean }, setOptions: React.Dispatch<React.SetStateAction<any>> }) {
      return (
         <Card>
             <CardHeader>
                 <CardTitle className="text-base font-medium">Opciones</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 pt-2">
                 <div className="flex items-center justify-between">
                     <Label htmlFor="use-synonyms">Usar Sinónimos</Label>
-                    <Switch id="use-synonyms" checked={options.useSynonyms} onCheckedChange={(c) => setOptions(p => ({...p, useSynonyms: c}))} />
+                    <Switch id="use-synonyms" checked={options.useSynonyms} onCheckedChange={(c) => setOptions((p: any) => ({...p, useSynonyms: c}))} />
                 </div>
                 <div className="flex items-center justify-between">
                     <Label htmlFor="use-views">Usar Vistas</Label>
-                    <Switch id="use-views" checked={options.useViews} onCheckedChange={(c) => setOptions(p => ({...p, useViews: c}))} />
+                    <Switch id="use-views" checked={options.useViews} onCheckedChange={(c) => setOptions((p: any) => ({...p, useViews: c}))} />
                 </div>
                  <div className="flex items-center justify-between">
                     <Label htmlFor="cqrs">CORS</Label>
-                    <Switch id="cqrs" checked={options.cqrs} onCheckedChange={(c) => setOptions(p => ({...p, cqrs: c}))} />
+                    <Switch id="cqrs" checked={options.cqrs} onCheckedChange={(c) => setOptions((p: any) => ({...p, cqrs: c}))} />
                 </div>
             </CardContent>
         </Card>
     );
 }
 
-function PlanManager({ plan, setPlan }) {
-    // Dummy state for new operation form
+function PlanManager({ plan, setPlan }: { plan: RefactorPlan, setPlan: React.Dispatch<React.SetStateAction<RefactorPlan>> }) {
     const [newOp, setNewOp] = useState({ scope: 'column', tableFrom: '', columnFrom: '', tableTo: '' });
 
     const handleAddOperation = () => {
-        if (!newOp.tableFrom) return; // Add more validation as needed
+        if (!newOp.tableFrom) return; 
         const op: RenameOperation = {
             scope: newOp.scope as any,
             tableFrom: newOp.tableFrom,
-            ...(newOp.scope === 'column' && { columnFrom: newOp.columnFrom, columnTo: newOp.tableTo }),
-            ...(newOp.scope === 'table' && { tableTo: newOp.tableTo }),
+            ...(newOp.scope === 'column' ? 
+                { columnFrom: newOp.columnFrom, columnTo: newOp.tableTo } : 
+                { tableTo: newOp.tableTo, columnFrom: undefined }
+            ),
         };
         setPlan(prev => ({ ...prev, renames: [...prev.renames, op] }));
-        // Reset form
         setNewOp({ scope: 'column', tableFrom: '', columnFrom: '', tableTo: '' });
     };
 
@@ -141,29 +146,34 @@ function PlanManager({ plan, setPlan }) {
                     <div>
                         <Label className="text-xs text-muted-foreground">Añadir operacion</Label>
                         <div className="grid grid-cols-5 gap-2 mt-1">
-                            {/* This is a simplified form. A real one would use selects and better state management */}
-                            <Input placeholder="Scope" value={newOp.scope} onChange={e => setNewOp({...newOp, scope: e.target.value})} />
+                            <Select value={newOp.scope} onValueChange={v => setNewOp({...newOp, scope: v})}>
+                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="table">table</SelectItem>
+                                    <SelectItem value="column">column</SelectItem>
+                                </SelectContent>
+                            </Select>
                             <Input placeholder="TableFrom" value={newOp.tableFrom} onChange={e => setNewOp({...newOp, tableFrom: e.target.value})} />
                             <Input placeholder="ColumnFrom" value={newOp.columnFrom} onChange={e => setNewOp({...newOp, columnFrom: e.target.value})} disabled={newOp.scope !== 'column'} />
-                            <Input placeholder="TableTo/ColumnTo" value={newOp.tableTo} onChange={e => setNewOp({...newOp, tableTo: e.target.value})} />
-                            <Button onClick={handleAddOperation}>Añadir</Button>
+                            <Input placeholder={newOp.scope === 'table' ? 'TableTo' : 'ColumnTo'} value={newOp.tableTo} onChange={e => setNewOp({...newOp, tableTo: e.target.value})} />
+                            <Button onClick={handleAddOperation} variant="outline">Añadir</Button>
                         </div>
                     </div>
                     <div className="space-y-2">
                         {plan.renames.map((op, index) => (
-                             <div key={index} className="flex items-center justify-between bg-muted/50 p-2 rounded-md text-sm">
-                                <div className="flex items-center gap-4 font-mono text-xs">
-                                    <Badge variant="outline" className="w-20 justify-center">{op.scope}</Badge>
-                                    <span>{op.scope === 'table' ? `${op.tableFrom} -> ${op.tableTo}` : `${op.tableFrom}.${op.columnFrom} -> ${op.columnTo}`}</span>
-                                </div>
-                                <div className="flex items-center">
-                                    <Button variant="ghost" size="icon" className="h-6 w-6"><Pencil className="h-4 w-4"/></Button>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveOperation(index)}><Trash2 className="h-4 w-4"/></Button>
-                                </div>
+                             <div key={index} className="grid grid-cols-5 items-center gap-4 text-sm font-mono">
+                                 <Badge variant="outline" className="w-20 justify-center">{op.scope}</Badge>
+                                 <span>{op.tableFrom}</span>
+                                 <span>{op.columnFrom ?? '-'}</span>
+                                 <span>{op.scope === 'table' ? op.tableTo : op.columnTo}</span>
+                                 <div className="flex items-center justify-end">
+                                    <Button variant="ghost" size="icon" className="h-7 w-7"><Pencil className="h-4 w-4"/></Button>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRemoveOperation(index)}><Trash2 className="h-4 w-4"/></Button>
+                                 </div>
                              </div>
                         ))}
                          {plan.renames.length === 0 && (
-                            <p className="text-sm text-muted-foreground text-center py-4">No hay operaciones en el plan.</p>
+                            <p className="text-sm text-muted-foreground text-center py-8">No hay operaciones en el plan.</p>
                         )}
                     </div>
                 </div>
@@ -171,6 +181,54 @@ function PlanManager({ plan, setPlan }) {
         </Card>
     );
 }
+
+function SchemaSummary({ onAnalyze, loading }: { onAnalyze: () => void, loading: boolean }) {
+    // Dummy data for display based on the image
+    const summaryData = [
+        { name: 'orders', cols: 5, fx: 1, idx: 1 },
+        { name: 'products', cols: 3, fx: 2, idx: 2 },
+        { name: 'users', cols: 4, fx: 2, idx: 2 },
+    ];
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base font-medium">Esquema</CardTitle>
+                <Button variant="outline" size="sm" onClick={onAnalyze} disabled={loading}>
+                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Database className="mr-2 h-4 w-4"/>} Analizar
+                </Button>
+            </CardHeader>
+            <CardContent>
+                <UiTable>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Tabla</TableHead>
+                            <TableHead className="text-right"># Cols</TableHead>
+                            <TableHead className="text-right"># FX</TableHead>
+                            <TableHead className="text-right"># IDX</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {summaryData.map(table => (
+                            <TableRow key={table.name}>
+                                <TableCell className="font-mono text-xs">{table.name}</TableCell>
+                                <TableCell className="text-right">{table.cols}</TableCell>
+                                <TableCell className="text-right">{table.fx}</TableCell>
+                                <TableCell className="text-right">{table.idx}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </UiTable>
+                 <Button variant="ghost" size="sm" className="w-full mt-2 text-muted-foreground">
+                    <Link href="/schema" className="flex items-center">
+                        <Eye className="mr-2 h-4 w-4"/> Ver esquema completo
+                    </Link>
+                </Button>
+            </CardContent>
+        </Card>
+    );
+}
+
 
 function ConnectionView() {
   const context = useContext(DbSessionContext);
@@ -220,7 +278,7 @@ function ConnectionView() {
           <Button
             onClick={onConnect}
             disabled={loading || !cs.trim()}
-            className="w-full text-base py-6 bg-green-600 hover:bg-green-700 text-white"
+            className="w-full text-base py-6 bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             {loading ? <Loader2 className="animate-spin" /> : <CheckCircle />}
             Conectar de forma segura
@@ -247,9 +305,10 @@ export default function RefactorPage() {
   
   const [loading, setLoading] = useState<"preview" | "apply" | "cleanup" | "analyze" | "plan" | "codefix" | false>(false);
   const [result, setResult] = useState<RefactorResponse | null>(null);
+  const [schema, setSchema] = useState<SchemaResponse | null>(null);
   
   const [isCleanupAlertOpen, setCleanupAlertOpen] = useState(false);
-  const [cleanupConfirmation, setCleanupConfirmation] = useState("");
+  const [isApplyAlertOpen, setApplyAlertOpen] = useState(false);
   
   const { toast, dismiss } = useToast();
 
@@ -288,7 +347,9 @@ export default function RefactorPage() {
       const errorMessage = getErrorMessage(err);
       dismiss(id);
       toast({ variant: "destructive", title: toastMessages.error, description: errorMessage, duration: 5000 });
-      setResult({ ok: false, error: errorMessage });
+      if(loadingState !== 'analyze') {
+        setResult({ ok: false, error: errorMessage });
+      }
     } finally {
       setLoading(false);
     }
@@ -300,19 +361,45 @@ export default function RefactorPage() {
     (data) => setResult(prev => ({ ...prev, sql: data.sql, ok: true, apply: false, codefix: prev?.codefix || null, dbLog: prev?.dbLog, log: prev?.log })),
     { loading: "Generando plan...", success: "Plan generado.", error: "Fallo al generar el plan." }
   );
+  
+  const handleAnalyze = () => handleApiCall(
+    () => analyzeSchema(sessionId!),
+    "analyze",
+    (data) => setSchema(data),
+    { loading: "Analizando esquema...", success: "Esquema analizado.", error: "Fallo al analizar el esquema." }
+  );
 
   const handleRefactor = (apply: boolean) => {
     if (!sessionId) return;
+    if (apply) {
+        setApplyAlertOpen(true);
+        return;
+    }
+    
     handleApiCall(
     () => runRefactor({ sessionId, plan, apply, rootKey, ...options }),
-    apply ? "apply" : "preview",
+    "preview",
     (data) => setResult(prev => ({ ...prev, ...data })),
     { 
-      loading: apply ? "Aplicando cambios..." : "Generando vista previa...",
-      success: apply ? "Cambios aplicados." : "Vista previa generada.",
-      error: apply ? "Error al aplicar cambios." : "Error al generar la vista previa."
+      loading: "Generando vista previa...",
+      success: "Vista previa generada.",
+      error: "Error al generar la vista previa."
     }
   );
+  }
+  
+  const confirmApply = () => {
+     handleApiCall(
+        () => runRefactor({ sessionId: sessionId!, plan, apply: true, rootKey, ...options }),
+        "apply",
+        (data) => setResult(prev => ({ ...prev, ...data })),
+        { 
+          loading: "Aplicando cambios...",
+          success: "Cambios aplicados.",
+          error: "Error al aplicar cambios."
+        }
+    );
+    setApplyAlertOpen(false);
   }
 
   const triggerCleanup = () => {
@@ -327,19 +414,18 @@ export default function RefactorPage() {
         (data) => {
             setResult(data);
             setCleanupAlertOpen(false);
-            setCleanupConfirmation("");
         },
         { loading: "Ejecutando limpieza...", success: "Limpieza completada.", error: "Falló la limpieza." }
     );
   }
   
-  const handleCodefix = (apply: boolean) => handleApiCall(
-    () => runCodeFix({ rootKey, plan, apply }),
+  const handleCodefix = () => handleApiCall(
+    () => runCodeFix({ rootKey, plan, apply: false }),
     "codefix",
-    (data) => setResult(prev => ({ ...prev, codefix: data, ok: data.ok, apply: apply, sql: prev?.sql || null })),
+    (data) => setResult(prev => ({ ...prev, codefix: data, ok: data.ok, apply: false, sql: prev?.sql || null })),
     { 
-      loading: apply ? "Aplicando correcciones de código..." : "Previsualizando correcciones de código...",
-      success: apply ? "Correcciones de código aplicadas." : "Previsualización de correcciones generada.",
+      loading: "Previsualizando correcciones de código...",
+      success: "Previsualización de correcciones generada.",
       error: "Fallo al ejecutar CodeFix."
     }
   );
@@ -382,7 +468,7 @@ export default function RefactorPage() {
                     <ConnectionView />
                 </div>
             ) : (
-             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full items-start">
                 {/* Columna Izquierda */}
                 <div className="lg:col-span-1 flex flex-col gap-6">
                     <ConnectionManager/>
@@ -393,40 +479,34 @@ export default function RefactorPage() {
                 {/* Columna Derecha */}
                 <div className="lg:col-span-2 flex flex-col gap-6">
                     <PlanManager plan={plan} setPlan={setPlan}/>
-
+                    
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleRefactor(false)} disabled={!sessionId || plan.renames.length === 0 || !!loading}>
-                            {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
-                            Vista Previa BD
+                        <Button variant="outline" size="sm" onClick={() => handleRefactor(false)} disabled={!!loading}>
+                            {loading === 'preview' ? <Loader2 className="animate-spin h-4 w-4" /> : <Eye className="h-4 w-4"/>}
+                            <span className="ml-2">Vista Previa BD</span>
                         </Button>
-                        <Button variant="outline" size="sm" onClick={handlePlan} disabled={!sessionId || plan.renames.length === 0 || !!loading}>
-                            {loading === 'plan' ? <Loader2 className="animate-spin" /> : <FileText/>}
-                            Generar SQL
+                        <Button variant="outline" size="sm" onClick={handlePlan} disabled={!!loading}>
+                            {loading === 'plan' ? <Loader2 className="animate-spin h-4 w-4" /> : <FileCode className="h-4 w-4"/>}
+                            <span className="ml-2">Generar SQL</span>
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleCodefix(false)} disabled={!sessionId || plan.renames.length === 0 || !!loading}>
-                            {loading === 'codefix' ? <Loader2 className="animate-spin" /> : <FileCode/>}
-                            Vista Previa Código
+                        <Button variant="outline" size="sm" onClick={handleCodefix} disabled={!!loading}>
+                            {loading === 'codefix' ? <Loader2 className="animate-spin h-4 w-4" /> : <FileCode className="h-4 w-4"/>}
+                            <span className="ml-2">Vista Previa Código</span>
                         </Button>
-                        <Button onClick={() => handleRefactor(true)} disabled={!sessionId || plan.renames.length === 0 || !!loading} className="ml-auto">
-                            {loading === 'apply' ? <Loader2 className="animate-spin" /> : <Play />}
-                            Aplicar
+                        <Button onClick={() => handleRefactor(true)} disabled={!!loading} className="ml-auto bg-primary text-primary-foreground">
+                            {loading === 'apply' ? <Loader2 className="animate-spin h-4 w-4" /> : <Play className="h-4 w-4"/>}
+                            <span className="ml-2">Aplicar</span>
                         </Button>
                     </div>
+
 
                     <div className="grid grid-cols-2 gap-6 flex-1">
                         <div className="flex flex-col">
                            <ResultsPanel result={result} loading={!!loading} error={result?.error || null} />
                         </div>
-                        <Card>
-                            <CardHeader className="flex flex-row justify-between items-center">
-                                <CardTitle className="text-base font-medium">Esquema</CardTitle>
-                                <Button variant="outline" size="sm"><Database className="mr-2 h-4 w-4"/> Analizar</Button>
-                            </CardHeader>
-                            <CardContent>
-                                {/* Schema summary table would go here */}
-                                <p className="text-sm text-muted-foreground">Analiza el esquema para ver las tablas.</p>
-                            </CardContent>
-                        </Card>
+                        <div className="flex flex-col">
+                          <SchemaSummary onAnalyze={handleAnalyze} loading={loading === 'analyze'}/>
+                        </div>
                     </div>
                 </div>
              </div>
@@ -434,29 +514,22 @@ export default function RefactorPage() {
         </main>
       </SidebarInset>
       
-      <AlertDialog open={isCleanupAlertOpen} onOpenChange={setCleanupAlertOpen}>
+      <AlertDialog open={isApplyAlertOpen} onOpenChange={setApplyAlertOpen}>
           <AlertDialogContent>
               <AlertDialogHeader>
-                  <AlertDialogTitle>¿Eliminar objetos de la base de datos?</AlertDialogTitle>
+                  <AlertDialogTitle>¿Aplicar los cambios?</AlertDialogTitle>
                   <AlertDialogDescription>
-                      Esta acción es irreversible y podría incluir operaciones como DROP TABLE o DROP COLUMN si están en el plan.
-                      Por favor, escribe "ELIMINAR" para confirmar.
+                      Esta acción ejecutará los scripts SQL y los cambios de código en tu base de datos y repositorio. Esta acción puede ser irreversible.
                   </AlertDialogDescription>
               </AlertDialogHeader>
-              <Input
-                value={cleanupConfirmation}
-                onChange={e => setCleanupConfirmation(e.target.value)}
-                placeholder='ELIMINAR'
-                className="my-4"
-              />
               <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setCleanupConfirmation("")}>Cancelar</AlertDialogCancel>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
                   <AlertDialogAction
-                      onClick={handleCleanup}
-                      disabled={cleanupConfirmation !== 'ELIMINAR' || loading === 'cleanup'}
-                      className={buttonVariants({ variant: "destructive" })}
+                      onClick={confirmApply}
+                      disabled={loading === 'apply'}
+                      className={buttonVariants({ variant: "default" })}
                   >
-                     {loading === 'cleanup' ? <Loader2 className="animate-spin" /> : "Sí, eliminar"}
+                     {loading === 'apply' ? <Loader2 className="animate-spin" /> : "Sí, aplicar cambios"}
                   </AlertDialogAction>
               </AlertDialogFooter>
           </AlertDialogContent>
