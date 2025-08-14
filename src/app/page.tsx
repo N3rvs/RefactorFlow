@@ -295,12 +295,6 @@ export default function RefactorPage() {
                       </SidebarMenuButton>
                     </Link>
                   </SidebarMenuItem>
-                   <SidebarMenuItem>
-                      <SidebarMenuButton disabled>
-                          <SlidersHorizontal />
-                          Configuración
-                      </SidebarMenuButton>
-                  </SidebarMenuItem>
               </SidebarMenu>
           </SidebarContent>
           <SidebarFooter>
@@ -313,20 +307,6 @@ export default function RefactorPage() {
           </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-         <header className="sticky top-0 z-10 w-full border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="container flex h-14 max-w-screen-2xl items-center">
-                <div className="mr-4 hidden md:flex">
-                  <h1 className="text-xl font-medium">Refactorizar BD + Código</h1>
-                </div>
-                <div className="flex flex-1 items-center justify-end space-x-4">
-                  <Badge variant="outline" className="text-xs font-normal">Desarrollo</Badge>
-                  <Badge variant="secondary" className="text-xs font-normal flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                    https://localhost:7040
-                  </Badge>
-                </div>
-            </div>
-        </header>
         <main className="flex-grow p-4 sm:p-6 lg:p-8">
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start h-full">
               

@@ -388,12 +388,6 @@ export default function SchemaPage() {
                       </SidebarMenuButton>
                     </Link>
                   </SidebarMenuItem>
-                   <SidebarMenuItem>
-                      <SidebarMenuButton disabled>
-                          <SlidersHorizontal />
-                          Configuración
-                      </SidebarMenuButton>
-                  </SidebarMenuItem>
               </SidebarMenu>
           </SidebarContent>
           <SidebarFooter>
