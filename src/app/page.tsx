@@ -41,6 +41,8 @@ const initialPlan: RefactorPlan = {
   renames: [],
 };
 
+type ActionModalType = "preview" | "plan" | "codefix" | null;
+
 function ConnectionManager() {
     const context = useContext(DbSessionContext);
     if (!context) throw new Error("ConnectionManager must be used within a DbSessionProvider");
@@ -306,6 +308,7 @@ export default function RefactorPage() {
   
   const [isCleanupAlertOpen, setCleanupAlertOpen] = useState(false);
   const [isApplyAlertOpen, setApplyAlertOpen] = useState(false);
+  const [actionModal, setActionModal] = useState<ActionModalType>(null);
   
   const { toast, dismiss } = useToast();
 
@@ -366,14 +369,9 @@ export default function RefactorPage() {
     { loading: "Analizando esquema...", success: "Esquema analizado.", error: "Fallo al analizar el esquema." }
   );
 
-  const handleRefactor = (apply: boolean) => {
-    if (apply) {
-        setApplyAlertOpen(true);
-        return;
-    }
-    
+  const handleRefactorPreview = () => {
     handleApiCall(
-    () => runRefactor({ sessionId: sessionId!, plan, apply, rootKey, ...options }),
+    () => runRefactor({ sessionId: sessionId!, plan, apply: false, rootKey, ...options }),
     "preview",
     (data) => setResult(prev => ({ ...prev, ...data })),
     { 
@@ -426,6 +424,24 @@ export default function RefactorPage() {
     }
   );
 
+  const actionModalContent = {
+    preview: {
+        title: "Generar Vista Previa de Base de Datos",
+        description: "Esta acción simulará los cambios del plan contra la base de datos conectada y generará los scripts SQL de 'rename' y 'compat', pero no los aplicará. Es un paso seguro para revisar los cambios.",
+        action: handleRefactorPreview
+    },
+    plan: {
+        title: "Generar Scripts SQL",
+        description: "Esta acción generará los scripts SQL basados en el plan de refactorización y las opciones seleccionadas. Los scripts no se ejecutarán.",
+        action: handlePlan
+    },
+    codefix: {
+        title: "Generar Vista Previa de Código",
+        description: "Esta acción analizará tu repositorio local y mostrará una vista previa de los cambios de código necesarios para alinearse con el plan de refactorización. No se aplicará ningún cambio.",
+        action: handleCodefix
+    }
+  }
+
   return (
     <div className="flex min-h-screen bg-background text-foreground font-sans">
       <Sidebar>
@@ -472,19 +488,19 @@ export default function RefactorPage() {
                     <PlanManager plan={plan} setPlan={setPlan}/>
                     
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleRefactor(false)} disabled={!!loading}>
+                        <Button variant="outline" size="sm" onClick={() => setActionModal("preview")} disabled={!!loading}>
                             {loading === 'preview' ? <Loader2 className="animate-spin h-4 w-4" /> : <Eye className="h-4 w-4"/>}
                             <span className="ml-2">Vista Previa BD</span>
                         </Button>
-                        <Button variant="outline" size="sm" onClick={handlePlan} disabled={!!loading}>
+                        <Button variant="outline" size="sm" onClick={() => setActionModal("plan")} disabled={!!loading}>
                             {loading === 'plan' ? <Loader2 className="animate-spin h-4 w-4" /> : <FileCode className="h-4 w-4"/>}
                             <span className="ml-2">Generar SQL</span>
                         </Button>
-                        <Button variant="outline" size="sm" onClick={handleCodefix} disabled={!!loading}>
+                        <Button variant="outline" size="sm" onClick={() => setActionModal("codefix")} disabled={!!loading}>
                             {loading === 'codefix' ? <Loader2 className="animate-spin h-4 w-4" /> : <FolderGit2 className="h-4 w-4"/>}
                             <span className="ml-2">Vista Previa Código</span>
                         </Button>
-                        <Button onClick={() => handleRefactor(true)} disabled={!!loading} className="ml-auto bg-primary text-primary-foreground hover:bg-primary/90">
+                        <Button onClick={() => setApplyAlertOpen(true)} disabled={!!loading} className="ml-auto bg-primary text-primary-foreground hover:bg-primary/90">
                             {loading === 'apply' ? <Loader2 className="animate-spin h-4 w-4" /> : <Play className="h-4 w-4"/>}
                             <span className="ml-2">Aplicar</span>
                         </Button>
@@ -523,6 +539,31 @@ export default function RefactorPage() {
                       className={buttonVariants({ variant: "default" })}
                   >
                      {loading === 'apply' ? <Loader2 className="animate-spin" /> : "Sí, aplicar cambios"}
+                  </AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
+
+       <AlertDialog open={!!actionModal} onOpenChange={() => setActionModal(null)}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>{actionModal && actionModalContent[actionModal].title}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      {actionModal && actionModalContent[actionModal].description}
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setActionModal(null)}>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                      onClick={() => {
+                          if (actionModal) {
+                            actionModalContent[actionModal].action();
+                          }
+                          setActionModal(null);
+                      }}
+                      className={buttonVariants({ variant: "default" })}
+                  >
+                    Sí, continuar
                   </AlertDialogAction>
               </AlertDialogFooter>
           </AlertDialogContent>
