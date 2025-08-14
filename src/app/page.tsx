@@ -56,6 +56,7 @@ import { Logo } from "@/components/logo";
 import ResultsPanel from "@/components/refactor/ResultsPanel";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import { useDbSession } from "@/hooks/useDbSession";
 
 const initialPlan: RefactorPlan = {
   renames: [],
@@ -68,8 +69,81 @@ const initialNewRename: Partial<RenameOperation> = {
 };
 
 
+function ConnectionCard() {
+    const { sessionId, connect, disconnect, expiresAt, loading, error } = useDbSession();
+    const [cs, setCs] = useState("");
+    const { toast } = useToast();
+
+    const onConnect = async () => {
+        if (!cs.trim()) return;
+        try {
+            await connect(cs.trim(), 3600); // 1 hour
+            setCs(""); // Clear immediately
+            toast({ title: "Conexión exitosa", description: "La sesión está activa." });
+        } catch (err: any) {
+            toast({ variant: "destructive", title: "Error de conexión", description: err.message });
+        }
+    };
+
+    const onDisconnect = async () => {
+        await disconnect();
+        toast({ title: "Desconectado", description: "La sesión ha terminado." });
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="font-medium text-base">Conexión</CardTitle>
+            </CardHeader>
+            <CardContent>
+                {!sessionId ? (
+                    <div className="space-y-2">
+                        <Label htmlFor="connection-string" className="text-xs text-muted-foreground">
+                            Cadena de Conexión (efímera, no se guarda)
+                        </Label>
+                        <Textarea
+                            id="connection-string"
+                            value={cs}
+                            onChange={(e) => setCs(e.target.value)}
+                            placeholder="Pega aquí tu cadena de conexión"
+                            className="w-full h-24 p-2 rounded border font-mono text-sm"
+                            autoComplete="off"
+                            spellCheck={false}
+                            name={`cs_${Math.random().toString(36).slice(2)}`}
+                            data-lpignore="true" data-1p-ignore="true"
+                        />
+                        <Button onClick={onConnect} disabled={loading || !cs.trim()} className="w-full">
+                            {loading ? <Loader2 className="animate-spin" /> : <Link2 />}
+                            Conectar
+                        </Button>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2 text-green-400">
+                             <CheckCircle className="h-4 w-4" />
+                             <span>Conectado</span>
+                          </div>
+                          <Button onClick={onDisconnect} variant="ghost" size="sm">Desconectar</Button>
+                      </div>
+                       {expiresAt && (
+                            <p className="text-xs text-muted-foreground">
+                                La sesión expira a las {new Date(expiresAt).toLocaleTimeString()}
+                            </p>
+                        )}
+                    </div>
+                )}
+                {error && !sessionId && (
+                    <p className="mt-2 text-xs text-destructive">{error}</p>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
+
 export default function RefactorPage() {
-  const [connectionString, setConnectionString] = useState("Server=NERVELESS;Database=StoreGuille;Trusted_Connection=True;Encrypt=True;TrustServerCertificate=True;");
+  const { sessionId, loading: sessionLoading } = useDbSession();
   const [plan, setPlan] = useState<RefactorPlan>(initialPlan);
   const [newRename, setNewRename] = useState<Partial<RenameOperation>>(initialNewRename);
   const [options, setOptions] = useState({ useSynonyms: true, useViews: true, cqrs: true, allowDestructive: false });
@@ -78,7 +152,6 @@ export default function RefactorPage() {
   const [loading, setLoading] = useState<"preview" | "apply" | "cleanup" | "analyze" | "plan" | "codefix" | false>(false);
   const [result, setResult] = useState<RefactorResponse | null>(null);
   const [schema, setSchema] = useState<SchemaResponse | null>(null);
-  const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
   
   const [isCleanupAlertOpen, setCleanupAlertOpen] = useState(false);
   const [cleanupConfirmation, setCleanupConfirmation] = useState("");
@@ -106,8 +179,8 @@ export default function RefactorPage() {
     onSuccess: (data: T) => void,
     toastMessages: { loading: string; success: string; error: string }
   ) => {
-    if (!connectionString.trim() && !['codefix', 'plan'].includes(loadingState)) {
-      toast({ variant: "destructive", title: "La cadena de conexión es obligatoria." });
+    if (!sessionId && !['codefix', 'plan'].includes(loadingState)) {
+      toast({ variant: "destructive", title: "La sesión no está activa." });
       return;
     }
      if (plan.renames.length === 0 && !['analyze', 'codefix', 'plan', 'preview', 'apply', 'cleanup'].includes(loadingState)) {
@@ -123,23 +196,27 @@ export default function RefactorPage() {
       dismiss(id);
       toast({ variant: "default", title: toastMessages.success, duration: 3000 });
       onSuccess(data);
-      if(loadingState === 'analyze') setConnectionOk(true);
     } catch (err) {
       const errorMessage = getErrorMessage(err);
       dismiss(id);
       toast({ variant: "destructive", title: toastMessages.error, description: errorMessage, duration: 5000 });
-      if(loadingState === 'analyze') setConnectionOk(false);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAnalyze = () => handleApiCall(
-    () => analyzeSchema(connectionString),
-    "analyze",
-    (data) => setSchema(data),
-    { loading: "Analizando esquema...", success: "Análisis de esquema completado.", error: "Falló el análisis de esquema." }
-  );
+  const handleAnalyze = () => {
+      if (!sessionId) {
+          toast({ variant: "destructive", title: "Conéctate primero para analizar el esquema."});
+          return;
+      }
+      handleApiCall(
+        () => analyzeSchema(sessionId),
+        "analyze",
+        (data) => setSchema(data),
+        { loading: "Analizando esquema...", success: "Análisis de esquema completado.", error: "Falló el análisis de esquema." }
+    );
+  }
 
   const handlePlan = () => handleApiCall(
     () => generatePlan({ renames: plan.renames, ...options }),
@@ -148,8 +225,13 @@ export default function RefactorPage() {
     { loading: "Generando plan...", success: "Plan generado.", error: "Fallo al generar el plan." }
   );
 
-  const handleRefactor = (apply: boolean) => handleApiCall(
-    () => runRefactor({ connectionString, plan, rootKey, ...options }, apply),
+  const handleRefactor = (apply: boolean) => {
+     if (!sessionId) {
+          toast({ variant: "destructive", title: "Conéctate primero para ejecutar la refactorización."});
+          return;
+      }
+    handleApiCall(
+    () => runRefactor({ sessionId, plan, rootKey, ...options }, apply),
     apply ? "apply" : "preview",
     (data) => setResult(prev => ({ ...prev, ...data })),
     { 
@@ -158,6 +240,7 @@ export default function RefactorPage() {
       error: apply ? "Error al aplicar cambios." : "Error al generar la vista previa."
     }
   );
+  }
 
   const triggerCleanup = () => {
     const hasDestructiveOps = plan.renames.some(op => op.scope.startsWith('drop'));
@@ -168,16 +251,22 @@ export default function RefactorPage() {
     }
   };
   
-  const handleCleanup = () => handleApiCall(
-    () => runCleanup({ connectionString, renames: plan.renames, ...options }),
-    "cleanup",
-    (data) => {
-        setResult(data);
-        setCleanupAlertOpen(false);
-        setCleanupConfirmation("");
-    },
-    { loading: "Ejecutando limpieza...", success: "Limpieza completada.", error: "Falló la limpieza." }
-  );
+  const handleCleanup = () => {
+    if (!sessionId) {
+        toast({ variant: "destructive", title: "Conéctate primero para ejecutar la limpieza."});
+        return;
+    }
+    handleApiCall(
+        () => runCleanup({ sessionId, renames: plan.renames, ...options }),
+        "cleanup",
+        (data) => {
+            setResult(data);
+            setCleanupAlertOpen(false);
+            setCleanupConfirmation("");
+        },
+        { loading: "Ejecutando limpieza...", success: "Limpieza completada.", error: "Falló la limpieza." }
+    );
+  }
   
   const handleCodefix = (apply: boolean) => handleApiCall(
     () => runCodeFix({ rootKey, plan, apply }),
@@ -299,9 +388,9 @@ export default function RefactorPage() {
           </SidebarContent>
           <SidebarFooter>
              <div className="p-2 border-t border-border">
-                 <Button variant={connectionOk ? "secondary" : "outline"} className="w-full mt-2 justify-start gap-2" onClick={handleAnalyze}>
-                      {loading === 'analyze' ? <Loader2 className="animate-spin" /> : <Power />}
-                      <span>{connectionOk === null ? "Probar Conexión" : connectionOk ? "Conexión OK" : "Conexión Fallida"}</span>
+                 <Button variant={"outline"} className="w-full mt-2 justify-start gap-2" onClick={handleAnalyze} disabled={!sessionId || loading === 'analyze'}>
+                      {loading === 'analyze' ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+                      <span>Analizar Esquema</span>
                  </Button>
               </div>
           </SidebarFooter>
@@ -311,24 +400,7 @@ export default function RefactorPage() {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start h-full">
               
               <div className="lg:col-span-2 flex flex-col gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="font-medium text-base">Conexión</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div>
-                            <Label htmlFor="connection-string" className="text-xs text-muted-foreground">Cadena de Conexión de la Base de Datos</Label>
-                            <Textarea
-                              id="connection-string"
-                              placeholder="server=myserver;Database=example;"
-                              rows={3}
-                              value={connectionString}
-                              onChange={(e) => setConnectionString(e.target.value)}
-                              className="font-mono text-sm mt-1 bg-background"
-                            />
-                        </div>
-                    </CardContent>
-                </Card>
+                <ConnectionCard />
                 <Card>
                     <CardHeader>
                       <CardTitle className="font-medium text-base">Repositorio</CardTitle>
@@ -412,7 +484,7 @@ export default function RefactorPage() {
                     </CardHeader>
                     <CardContent className="space-y-3">
                        <p className="text-xs text-muted-foreground pb-2">Una vez aplicados los cambios y actualizado el código, puedes eliminar los elementos de compatibilidad (vistas/sinónimos).</p>
-                       <Button ref={cleanupButtonRef} variant="secondary" className="w-full" onClick={triggerCleanup} disabled={loading === 'cleanup'}>
+                       <Button ref={cleanupButtonRef} variant="secondary" className="w-full" onClick={triggerCleanup} disabled={loading === 'cleanup' || !sessionId}>
                            {loading === 'cleanup' ? <Loader2 className="animate-spin" /> : <Trash2 />}
                            Ejecutar Limpieza
                         </Button>
@@ -573,7 +645,7 @@ export default function RefactorPage() {
                       )}
                     </CardContent>
                     <CardFooter className="flex flex-wrap gap-2 pt-4 border-t">
-                      <Button variant="outline" size="sm" onClick={() => handleRefactor(false)} disabled={loading === 'preview' || plan.renames.length === 0}>
+                      <Button variant="outline" size="sm" onClick={() => handleRefactor(false)} disabled={loading === 'preview' || plan.renames.length === 0 || !sessionId}>
                           {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
                           Vista Previa BD
                       </Button>
@@ -586,7 +658,7 @@ export default function RefactorPage() {
                           Vista Previa Código
                       </Button>
                       <div className="flex-grow"></div>
-                      <Button variant="destructive" size="sm" onClick={() => handleRefactor(true)} disabled={loading === 'apply' || plan.renames.length === 0}>
+                      <Button variant="destructive" size="sm" onClick={() => handleRefactor(true)} disabled={loading === 'apply' || plan.renames.length === 0 || !sessionId}>
                             {loading === 'apply' ? <Loader2 className="animate-spin" /> : <Play />}
                             Aplicar Cambios
                       </Button>
@@ -628,3 +700,5 @@ export default function RefactorPage() {
     </div>
   );
 }
+
+    

@@ -68,13 +68,30 @@ async function fetchApi<T>(
   }
 }
 
-/** GET /analyze/schema?connectionString=... */
-export async function analyzeSchema(connectionString: string): Promise<SchemaResponse> {
-  const qs = encodeURIComponent(connectionString);
-  return fetchApi<SchemaResponse>(`/analyze/schema?connectionString=${qs}`);
+/* --------- Sessions --------- */
+export async function connectSession(connectionString: string, ttlSeconds = 1800) {
+  return fetchApi<{ sessionId: string; expiresAtUtc: string }>("/session/connect", {
+    method: "POST",
+    body: JSON.stringify({ connectionString, ttlSeconds }),
+  });
 }
 
-/** POST /plan    (NO requiere connectionString) */
+export async function disconnectSession(sessionId: string) {
+  return fetchApi("/session/disconnect", {
+    method: "POST",
+    body: JSON.stringify({ sessionId }),
+  });
+}
+
+/** POST /analyze/schema (con sessionId) */
+export async function analyzeSchema(sessionId: string): Promise<SchemaResponse> {
+  return fetchApi<SchemaResponse>("/analyze/schema", {
+    method: 'POST',
+    body: JSON.stringify({ sessionId })
+  });
+}
+
+/** POST /plan    (NO requiere session) */
 export async function generatePlan(data: PlanRequest): Promise<PlanResponse> {
   const raw = await fetchApi<any>("/plan", {
     method: "POST",
@@ -84,9 +101,9 @@ export async function generatePlan(data: PlanRequest): Promise<PlanResponse> {
   return { sql, report: raw?.report ?? null };
 }
 
-/** POST /refactor/run  (sí requiere connectionString) */
+/** POST /refactor/run  (sí requiere sessionId) */
 export async function runRefactor(
-  data: Omit<RefactorRequest, "apply">,
+  data: Omit<RefactorRequest, "apply" | "connectionString"> & { sessionId: string },
   apply: boolean
 ): Promise<RefactorResponse> {
   const body: RefactorRequest = { ...data, apply };
@@ -96,18 +113,20 @@ export async function runRefactor(
   });
 }
 
-/** POST /apply/cleanup (sí requiere connectionString + renames) */
-export async function runCleanup(data: CleanupRequest): Promise<RefactorResponse> {
+/** POST /apply/cleanup (sí requiere sessionId) */
+export async function runCleanup(data: Omit<CleanupRequest, "connectionString"> & { sessionId: string }): Promise<RefactorResponse> {
   return fetchApi<RefactorResponse>("/apply/cleanup", {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
-/** POST /codefix/run (NO requiere connectionString) */
+/** POST /codefix/run (NO requiere session) */
 export async function runCodeFix(data: CodeFixRequest): Promise<CodefixResult> {
   return fetchApi<CodefixResult>("/codefix/run", {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
+
+    

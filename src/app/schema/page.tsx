@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import type { RefactorPlan, RefactorResponse, CleanupRequest, RefactorRequest, SchemaResponse, RenameOperation, PlanRequest, Table, Column } from "@/lib/types";
 import { runRefactor, runCleanup, analyzeSchema, generatePlan, runCodeFix } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +41,7 @@ import {
 import { Logo } from "@/components/logo";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import { useDbSession } from "@/hooks/useDbSession";
 
 function SchemaViewer({ 
     schema, 
@@ -48,14 +49,12 @@ function SchemaViewer({
     loading,
     plan,
     onPlanChange,
-    connectionString
 }: { 
     schema: SchemaResponse | null; 
-    onRefresh: (cs: string) => void; 
+    onRefresh: () => void; 
     loading: boolean;
     plan: RefactorPlan;
     onPlanChange: (newPlan: RefactorPlan) => void;
-    connectionString: string;
 }) {
     const hasSchema = schema && schema.tables && schema.tables.length > 0;
     const [newColumns, setNewColumns] = useState<Record<string, { name: string; type: string }>>({});
@@ -195,7 +194,7 @@ function SchemaViewer({
                     <Database className="h-4 w-4" />
                     <CardTitle className="text-base font-medium">Esquema de la Base de Datos</CardTitle>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => onRefresh(connectionString)} disabled={loading} className="text-xs">
+                <Button variant="ghost" size="sm" onClick={onRefresh} disabled={loading} className="text-xs">
                     {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-2 h-3 w-3" />}
                     Actualizar
                 </Button>
@@ -221,7 +220,7 @@ function SchemaViewer({
                     <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-96">
                         <Database className="h-16 w-16 mb-4" />
                         <h3 className="text-lg font-medium">Conecta tu base de datos</h3>
-                        <p className="text-sm">Presiona "Probar Conexión" para cargar y visualizar el esquema.</p>
+                        <p className="text-sm">Usa la página de Refactorización para iniciar una sesión y luego vuelve aquí para ver el esquema.</p>
                     </div>
                 )}
                 {hasSchema && !loading && (
@@ -317,12 +316,11 @@ function SchemaViewer({
 
 
 export default function SchemaPage() {
-  const [connectionString, setConnectionString] = useState("Server=NERVELESS;Database=StoreGuille;Trusted_Connection=True;Encrypt=True;TrustServerCertificate=True;");
+  const { sessionId, loading: sessionLoading, disconnect } = useDbSession();
   const [plan, setPlan] = useState<RefactorPlan>({ renames: [] });
   
   const [loading, setLoading] = useState<"analyze" | false>(false);
   const [schema, setSchema] = useState<SchemaResponse | null>(null);
-  const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
   
   const { toast, dismiss } = useToast();
 
@@ -331,32 +329,36 @@ export default function SchemaPage() {
     return "Ocurrió un error desconocido.";
   }
 
-  const handleAnalyze = (cs: string) => {
-    if (!cs.trim()) {
-      toast({ variant: "destructive", title: "La cadena de conexión es obligatoria." });
+  const handleAnalyze = () => {
+     if (!sessionId) {
+      toast({ variant: "destructive", title: "Inicia una sesión en la página de Refactorizar para ver el esquema." });
       return;
     }
 
     setLoading("analyze");
     const { id } = toast({ title: "Analizando esquema...", duration: 999999 });
 
-    analyzeSchema(cs)
+    analyzeSchema(sessionId)
       .then(data => {
         dismiss(id);
         toast({ variant: "default", title: "Análisis de esquema completado.", duration: 3000 });
         setSchema(data);
-        setConnectionOk(true);
       })
       .catch(err => {
         const errorMessage = getErrorMessage(err);
         dismiss(id);
         toast({ variant: "destructive", title: "Falló el análisis de esquema.", description: errorMessage, duration: 5000 });
-        setConnectionOk(false);
       })
       .finally(() => {
         setLoading(false);
       });
   };
+
+  useEffect(() => {
+    if(sessionId) {
+        handleAnalyze();
+    }
+  }, [sessionId])
 
   return (
     <div className="flex min-h-screen bg-background text-foreground font-sans">
@@ -392,9 +394,9 @@ export default function SchemaPage() {
           </SidebarContent>
           <SidebarFooter>
              <div className="p-2 border-t border-border">
-                 <Button variant={connectionOk ? "secondary" : "outline"} className="w-full mt-2 justify-start gap-2" onClick={() => handleAnalyze(connectionString)}>
-                      {loading === 'analyze' ? <Loader2 className="animate-spin" /> : <Power />}
-                      <span>{connectionOk === null ? "Probar Conexión" : connectionOk ? "Conexión OK" : "Conexión Fallida"}</span>
+                 <Button variant={"outline"} className="w-full mt-2 justify-start gap-2" onClick={disconnect} disabled={!sessionId || sessionLoading}>
+                      {sessionLoading ? <Loader2 className="animate-spin" /> : <Power />}
+                      <span>{sessionId ? "Desconectar" : "Sin Conexión"}</span>
                  </Button>
               </div>
           </SidebarFooter>
@@ -411,37 +413,14 @@ export default function SchemaPage() {
             </div>
         </header>
         <main className="flex-grow p-4 sm:p-6 lg:p-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start h-full">
-              
-              <div className="lg:col-span-1 flex flex-col gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="font-medium text-base">Conexión</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div>
-                            <Label htmlFor="connection-string" className="text-xs text-muted-foreground">Cadena de Conexión de la Base de Datos</Label>
-                            <Textarea
-                              id="connection-string"
-                              placeholder="server=myserver;Database=example;"
-                              rows={3}
-                              value={connectionString}
-                              onChange={(e) => setConnectionString(e.target.value)}
-                              className="font-mono text-sm mt-1 bg-background"
-                            />
-                        </div>
-                    </CardContent>
-                </Card>
-              </div>
-
+            <div className="grid grid-cols-1 lg:grid-cols-1 gap-6 items-start h-full">
               <div className="lg:col-span-1 flex flex-col gap-6">
                   <SchemaViewer 
                     schema={schema} 
                     onRefresh={handleAnalyze} 
-                    loading={loading === 'analyze'}
+                    loading={loading === 'analyze' || sessionLoading}
                     plan={plan}
                     onPlanChange={setPlan}
-                    connectionString={connectionString}
                    />
               </div>
             </div>
@@ -450,3 +429,5 @@ export default function SchemaPage() {
     </div>
   );
 }
+
+    
