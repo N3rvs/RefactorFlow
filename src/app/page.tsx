@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import type { RefactorPlan, RefactorResponse, CleanupRequest, RefactorRequest, SchemaResponse, RenameOperation, PlanRequest, Table } from "@/lib/types";
 import { runRefactor, runCleanup, analyzeSchema, generatePlan, runCodeFix } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -56,7 +55,7 @@ import { Logo } from "@/components/logo";
 import ResultsPanel from "@/components/refactor/ResultsPanel";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { useDbSession } from "@/hooks/useDbSession";
+import { useDbSession, DbSessionContext } from "@/hooks/useDbSession";
 
 const initialPlan: RefactorPlan = {
   renames: [],
@@ -70,14 +69,16 @@ const initialNewRename: Partial<RenameOperation> = {
 
 
 function ConnectionCard() {
-    const { sessionId, connect, disconnect, expiresAt, loading, error } = useDbSession();
+    const context = useContext(DbSessionContext);
+    if (!context) throw new Error("ConnectionCard must be used within a DbSessionProvider");
+    
+    const { sessionId, connect, disconnect, expiresAt, loading, error } = context;
     const [cs, setCs] = useState("");
     const [textareaName, setTextareaName] = useState("connection-string-ssr");
     const { toast } = useToast();
 
     useEffect(() => {
-        // Evita el error de hidratación de React al asegurar que el nombre aleatorio
-        // se genera solo en el cliente, después del montaje.
+        // This should only run on the client to avoid hydration mismatch
         setTextareaName(`cs_${Math.random().toString(36).slice(2)}`);
     }, []);
 
@@ -131,7 +132,9 @@ function ConnectionCard() {
                              <CheckCircle className="h-4 w-4" />
                              <span>Conectado</span>
                           </div>
-                          <Button onClick={onDisconnect} variant="ghost" size="sm">Desconectar</Button>
+                          <Button onClick={onDisconnect} variant="ghost" size="sm" disabled={loading}>
+                            {loading ? <Loader2 className="animate-spin h-3 w-3" /> : "Desconectar"}
+                          </Button>
                       </div>
                        {expiresAt && (
                             <p className="text-xs text-muted-foreground">
@@ -198,7 +201,11 @@ function SchemaDisplay({ schema, loading }: { schema: SchemaResponse | null, loa
 
 
 export default function RefactorPage() {
-  const { sessionId, loading: sessionLoading } = useDbSession();
+  const context = useContext(DbSessionContext);
+  if (!context) throw new Error("RefactorPage must be used within a DbSessionProvider");
+  
+  const { sessionId, loading: sessionLoading } = context;
+
   const [plan, setPlan] = useState<RefactorPlan>(initialPlan);
   const [newRename, setNewRename] = useState<Partial<RenameOperation>>(initialNewRename);
   const [options, setOptions] = useState({ useSynonyms: true, useViews: true, cqrs: true, allowDestructive: false });
@@ -260,7 +267,7 @@ export default function RefactorPage() {
     }
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = React.useCallback(() => {
       if (!sessionId) {
           toast({ variant: "destructive", title: "Conéctate primero para analizar el esquema."});
           return;
@@ -271,7 +278,7 @@ export default function RefactorPage() {
         (data) => setSchema(data),
         { loading: "Analizando esquema...", success: "Análisis de esquema completado.", error: "Falló el análisis de esquema." }
     );
-  }
+  }, [sessionId, toast]);
 
   const handlePlan = () => handleApiCall(
     () => generatePlan({ renames: plan.renames, ...options }),
@@ -286,7 +293,7 @@ export default function RefactorPage() {
           return;
       }
     handleApiCall(
-    () => runRefactor({ sessionId, plan, rootKey, ...options }, apply),
+    () => runRefactor({ sessionId, plan, apply, rootKey, ...options }),
     apply ? "apply" : "preview",
     (data) => setResult(prev => ({ ...prev, ...data })),
     { 
@@ -402,7 +409,7 @@ export default function RefactorPage() {
     if (sessionId && !schema) {
       handleAnalyze();
     }
-  }, [sessionId]);
+  }, [sessionId, schema, handleAnalyze]);
   
   useEffect(() => {
     if (result && result.error) {

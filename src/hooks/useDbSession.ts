@@ -1,14 +1,26 @@
 
-import { useCallback, useEffect, useRef, useState } from "react";
+"use client";
+
+import React, { createContext, useCallback, useEffect, useRef, useState } from "react";
 import { connectSession, disconnectSession } from "@/lib/api";
 
-export function useDbSession() {
+interface DbSessionContextType {
+    sessionId: string | null;
+    connect: (connectionString: string, ttlSeconds?: number) => Promise<string>;
+    disconnect: () => Promise<void>;
+    expiresAt: number | null;
+    loading: boolean;
+    error: string | null;
+}
+
+export const DbSessionContext = createContext<DbSessionContextType | null>(null);
+
+export const DbSessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const expireAt = useRef<number | null>(null);
+  const [expiresAt, setExpiresAt] = useState<number | null>(null);
   const sessionRef = useRef<string | null>(null);
-
 
   const connect = useCallback(async (connectionString: string, ttlSeconds = 1800) => {
     setLoading(true);
@@ -17,7 +29,8 @@ export function useDbSession() {
         const { sessionId: newSessionId, expiresAtUtc } = await connectSession(connectionString, ttlSeconds);
         setSessionId(newSessionId);
         sessionRef.current = newSessionId;
-        expireAt.current = Date.parse(expiresAtUtc);
+        const expires = Date.parse(expiresAtUtc);
+        setExpiresAt(expires);
         return newSessionId;
     } catch(err: any) {
         setError(err.message || "Failed to connect");
@@ -38,7 +51,7 @@ export function useDbSession() {
         } finally {
             setSessionId(null);
             sessionRef.current = null;
-            expireAt.current = null;
+            setExpiresAt(null);
             setLoading(false);
         }
     }
@@ -56,8 +69,20 @@ export function useDbSession() {
     window.addEventListener("beforeunload", onUnload);
     return () => window.removeEventListener("beforeunload", onUnload);
   }, []);
+  
+  const value = { sessionId, connect, disconnect, expiresAt, loading, error };
 
-  return { sessionId, connect, disconnect, expiresAt: expireAt.current, loading, error };
+  return (
+    <DbSessionContext.Provider value={value}>
+        {children}
+    </DbSessionContext.Provider>
+  )
 }
 
-    
+export function useDbSession() {
+  const context = React.useContext(DbSessionContext);
+  if (!context) {
+    throw new Error("useDbSession must be used within a DbSessionProvider");
+  }
+  return context;
+}

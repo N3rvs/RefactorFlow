@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { SidebarProvider } from '@/components/ui/sidebar';
+import { DbSessionProvider } from '@/hooks/useDbSession';
 
 export const metadata: Metadata = {
   title: 'DB Refactor Toolkit',
@@ -24,9 +25,11 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        <SidebarProvider>
-            {children}
-        </SidebarProvider>
+        <DbSessionProvider>
+          <SidebarProvider>
+              {children}
+          </SidebarProvider>
+        </DbSessionProvider>
         <Toaster />
       </body>
     </html>

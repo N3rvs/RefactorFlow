@@ -103,20 +103,16 @@ export async function generatePlan(data: PlanRequest): Promise<PlanResponse> {
 
 /** POST /refactor/run  (sí requiere sessionId) */
 export async function runRefactor(
-  data: Omit<RefactorRequest, "apply" | "connectionString" | "rootKey" | "useSynonyms" | "useViews" | "cqrs"> & { sessionId: string },
-  apply: boolean,
-  rootKey: string,
-  options: { useSynonyms: boolean, useViews: boolean, cqrs: boolean }
+  data: RefactorRequest,
 ): Promise<RefactorResponse> {
-  const body: RefactorRequest = { ...data, ...options, rootKey, apply };
   return fetchApi<RefactorResponse>("/refactor/run", {
     method: "POST",
-    body: JSON.stringify(body),
+    body: JSON.stringify(data),
   });
 }
 
 /** POST /apply/cleanup (sí requiere sessionId) */
-export async function runCleanup(data: Omit<CleanupRequest, "connectionString"> & { sessionId: string }): Promise<RefactorResponse> {
+export async function runCleanup(data: CleanupRequest): Promise<RefactorResponse> {
   return fetchApi<RefactorResponse>("/apply/cleanup", {
     method: "POST",
     body: JSON.stringify(data),

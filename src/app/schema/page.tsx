@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useContext } from "react";
 import type { RefactorPlan, RefactorResponse, CleanupRequest, RefactorRequest, SchemaResponse, RenameOperation, PlanRequest, Table, Column } from "@/lib/types";
 import { runRefactor, runCleanup, analyzeSchema, generatePlan, runCodeFix } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -41,7 +41,7 @@ import {
 import { Logo } from "@/components/logo";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { useDbSession } from "@/hooks/useDbSession";
+import { useDbSession, DbSessionContext } from "@/hooks/useDbSession";
 
 function SchemaViewer({ 
     schema, 
@@ -316,7 +316,10 @@ function SchemaViewer({
 
 
 export default function SchemaPage() {
-  const { sessionId, loading: sessionLoading, disconnect } = useDbSession();
+  const context = useContext(DbSessionContext);
+  if (!context) throw new Error("SchemaPage must be used within a DbSessionProvider");
+
+  const { sessionId, loading: sessionLoading, disconnect } = context;
   const [plan, setPlan] = useState<RefactorPlan>({ renames: [] });
   
   const [loading, setLoading] = useState<"analyze" | false>(false);
