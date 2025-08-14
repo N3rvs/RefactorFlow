@@ -52,8 +52,8 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
         return (
             <div className="text-center text-muted-foreground py-16">
                 <DatabaseZap className="mx-auto h-12 w-12" />
-                <h3 className="mt-4 text-lg font-medium">Ready to Refactor</h3>
-                <p className="mt-1 text-sm">The results of your actions will appear here.</p>
+                <h3 className="mt-4 text-lg font-medium">Listo para Refactorizar</h3>
+                <p className="mt-1 text-sm">Los resultados de tus acciones aparecerán aquí.</p>
             </div>
         );
     }
@@ -66,7 +66,7 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
       <Tabs defaultValue="summary" className="w-full">
         <div className="px-6 pt-0">
           <TabsList className="grid w-full grid-cols-4 bg-muted/50">
-            <TabsTrigger value="summary">Summary</TabsTrigger>
+            <TabsTrigger value="summary">Resumen</TabsTrigger>
             <TabsTrigger value="sql">SQL</TabsTrigger>
             <TabsTrigger value="codefix">CodeFix</TabsTrigger>
             <TabsTrigger value="logs">Logs</TabsTrigger>
@@ -77,13 +77,13 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
                 <div className="p-4 border-b flex justify-between items-center">
                     <div className="flex items-center gap-2">
                          <span className={`w-2 h-2 mr-2 rounded-full ${result.ok ? 'bg-green-500' : 'bg-destructive'}`}></span>
-                         <p className="font-medium text-sm">Summary</p> 
+                         <p className="font-medium text-sm">Resumen</p> 
                          <Badge variant={result.ok ? "default" : "destructive"} className={`text-xs ${result.ok ? 'bg-green-500/20 text-green-300 border-green-500/30' : ''}`}>
-                            {result.ok ? "ok" : "failed"}
+                            {result.ok ? "éxito" : "fallido"}
                          </Badge>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>{result.apply ? "Apply" : "Preview"}</span>
+                        <span>{result.apply ? "Aplicado" : "Vista Previa"}</span>
                         <ChevronRight className="h-4 w-4" />
                     </div>
                 </div>
@@ -91,24 +91,24 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
                    {codefix && (
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">File</span>
+                        <span className="text-muted-foreground">Archivo</span>
                         <span className="font-mono">{changedFile?.path.split('/').pop() || 'N/A'}</span>
                       </div>
                        <div className="flex justify-between">
-                        <span className="text-muted-foreground">Changed</span>
+                        <span className="text-muted-foreground">Modificado</span>
                         <Badge variant="outline" className={changedFile ? "text-green-400 border-green-500/30 bg-green-500/10" : ""}>
                           {changedFile ? <CheckCircle className="h-3 w-3 mr-1"/> : null}
-                          <span>{changedFile ? 'Yes' : 'No'}</span>
+                          <span>{changedFile ? 'Sí' : 'No'}</span>
                         </Badge>
                       </div>
                        <div className="flex justify-between">
-                        <span className="text-muted-foreground">Preview</span>
+                        <span className="text-muted-foreground">Vista Previa</span>
                          <button 
                             className="text-muted-foreground hover:text-foreground text-xs flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                             disabled={!changedFile}
                             onClick={() => changedFile && setSelectedFile(changedFile)}
                          >
-                           <Eye className="h-3 w-3"/> View
+                           <Eye className="h-3 w-3"/> Ver
                          </button>
                       </div>
                     </div>
@@ -116,12 +116,12 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
                    {error && (
                      <Alert variant="destructive" className="mt-4">
                         <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Operation Error</AlertTitle>
+                        <AlertTitle>Error de Operación</AlertTitle>
                         <AlertDescription><pre className="whitespace-pre-wrap font-mono text-xs">{error}</pre></AlertDescription>
                     </Alert>
                    )}
                    {!codefix && !error && (
-                     <p className="text-sm text-muted-foreground text-center py-4">No summary available.</p>
+                     <p className="text-sm text-muted-foreground text-center py-4">No hay resumen disponible.</p>
                    )}
                 </div>
             </div>
@@ -129,9 +129,9 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
         <TabsContent value="sql" className="p-6">
             <Tabs defaultValue="rename" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="rename">Rename</TabsTrigger>
-                    <TabsTrigger value="compat">Compatibility</TabsTrigger>
-                    <TabsTrigger value="cleanup">Cleanup</TabsTrigger>
+                    <TabsTrigger value="rename">Renombrar</TabsTrigger>
+                    <TabsTrigger value="compat">Compatibilidad</TabsTrigger>
+                    <TabsTrigger value="cleanup">Limpieza</TabsTrigger>
                 </TabsList>
                 <div className="mt-4 border rounded-md">
                   <TabsContent value="rename" className="m-0"><CodeBlock code={sql?.renameSql} /></TabsContent>
@@ -144,17 +144,17 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
             {codefix ? (
               <div className="border rounded-md">
                   <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2"><Bot /> CodeFix Report</CardTitle>
-                      <p className="text-xs text-muted-foreground">{codefix.changed} of {codefix.scanned} files changed.</p>
+                      <CardTitle className="text-sm font-medium flex items-center gap-2"><Bot /> Reporte de CodeFix</CardTitle>
+                      <p className="text-xs text-muted-foreground">{codefix.changed} de {codefix.scanned} archivos modificados.</p>
                   </CardHeader>
                   <CardContent>
                       <div className="max-h-80 overflow-y-auto">
                           <table className="w-full text-sm">
                               <thead>
                                   <tr className="border-b">
-                                      <th className="p-2 text-left font-medium text-muted-foreground">File</th>
-                                      <th className="p-2 w-24 text-center font-medium text-muted-foreground">Changed</th>
-                                      <th className="p-2 w-24 text-center font-medium text-muted-foreground">Preview</th>
+                                      <th className="p-2 text-left font-medium text-muted-foreground">Archivo</th>
+                                      <th className="p-2 w-24 text-center font-medium text-muted-foreground">Modificado</th>
+                                      <th className="p-2 w-24 text-center font-medium text-muted-foreground">Vista Previa</th>
                                   </tr>
                               </thead>
                               <tbody>
@@ -179,7 +179,7 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
                                       </tr>
                                   )) : (
                                       <tr>
-                                          <td colSpan={3} className="text-center text-muted-foreground py-8">No files were affected.</td>
+                                          <td colSpan={3} className="text-center text-muted-foreground py-8">No se afectaron archivos.</td>
                                       </tr>
                                   )}
                               </tbody>
@@ -190,8 +190,8 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
             ) : (
                 <div className="text-center text-muted-foreground py-16 border rounded-md">
                     <Info className="mx-auto h-12 w-12" />
-                    <h3 className="mt-4 text-lg font-medium">No CodeFix data</h3>
-                    <p className="mt-1 text-sm">Run a preview or apply changes to generate a report.</p>
+                    <h3 className="mt-4 text-lg font-medium">No hay datos de CodeFix</h3>
+                    <p className="mt-1 text-sm">Ejecuta una vista previa o aplica los cambios para generar un reporte.</p>
                 </div>
             )}
         </TabsContent>
@@ -201,7 +201,7 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
                     <CardTitle className="text-sm font-medium flex items-center gap-2"><Terminal /> Logs</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <CodeBlock code={dbLog || log || "No logs available for this operation."} />
+                    <CodeBlock code={dbLog || log || "No hay logs disponibles para esta operación."} />
                 </CardContent>
             </div>
         </TabsContent>
@@ -220,13 +220,13 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
     <Card>
        <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base font-medium flex items-center gap-2">
-            <FileText className="h-4 w-4" /> Result
+            <FileText className="h-4 w-4" /> Resultado
         </CardTitle>
         {result && (
             <div className="flex items-center gap-2 text-sm">
                 <span className={`w-2 h-2 rounded-full ${result.ok ? 'bg-green-500' : 'bg-destructive'}`}></span>
                 <Badge variant={result.ok ? "default" : "destructive"} className={`text-xs ${result.ok ? 'bg-green-500/20 text-green-300 border-green-500/30' : ''}`}>
-                    {result.apply ? 'Applied' : 'Preview'} - {result.ok ? "OK" : "Failed"}
+                    {result.apply ? 'Aplicado' : 'Vista Previa'} - {result.ok ? "Éxito" : "Fallido"}
                 </Badge>
             </div>
         )}

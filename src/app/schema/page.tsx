@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
@@ -192,18 +193,18 @@ function SchemaViewer({
             <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <div className="flex items-center gap-2">
                     <Database className="h-4 w-4" />
-                    <CardTitle className="text-base font-medium">Database Schema</CardTitle>
+                    <CardTitle className="text-base font-medium">Esquema de la Base de Datos</CardTitle>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => onRefresh(connectionString)} disabled={loading} className="text-xs">
                     {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-2 h-3 w-3" />}
-                    Refresh
+                    Actualizar
                 </Button>
             </CardHeader>
             <CardContent>
                 <div className="relative mb-4">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input 
-                        placeholder="Search tables..." 
+                        placeholder="Buscar tablas..." 
                         className="pl-10"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -219,8 +220,8 @@ function SchemaViewer({
                  {!loading && !hasSchema && (
                     <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-96">
                         <Database className="h-16 w-16 mb-4" />
-                        <h3 className="text-lg font-medium">Connect your database</h3>
-                        <p className="text-sm">Press "Check Connection" to load and visualize the schema.</p>
+                        <h3 className="text-lg font-medium">Conecta tu base de datos</h3>
+                        <p className="text-sm">Presiona "Probar Conexión" para cargar y visualizar el esquema.</p>
                     </div>
                 )}
                 {hasSchema && !loading && (
@@ -267,7 +268,7 @@ function SchemaViewer({
                                             <div key={id} className="flex justify-between items-center text-xs group gap-2 p-2 bg-muted/50 rounded-md">
                                                 <div className="flex items-center gap-2 flex-1">
                                                    <Input 
-                                                      placeholder="column_name"
+                                                      placeholder="nombre_columna"
                                                       className="h-7 text-xs border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent"
                                                       value={col.name}
                                                       onChange={(e) => handleNewColumnChange(id, 'name', e.target.value)}
@@ -275,7 +276,7 @@ function SchemaViewer({
                                                    />
                                                 </div>
                                                 <Input 
-                                                    placeholder="data_type"
+                                                    placeholder="tipo_dato"
                                                     className="h-7 text-xs border-none focus-visible:ring-1 focus-visible:ring-primary bg-transparent font-mono text-sky-400 w-24"
                                                      value={col.type}
                                                       onChange={(e) => handleNewColumnChange(id, 'type', e.target.value)}
@@ -286,12 +287,12 @@ function SchemaViewer({
                                             </div>
                                         ))}
                                         <Button variant="ghost" size="sm" className="w-full mt-2 text-xs" onClick={() => handleAddNewColumn(table.name)}>
-                                            <PlusCircle className="mr-2 h-3 w-3" /> Add Column
+                                            <PlusCircle className="mr-2 h-3 w-3" /> Añadir Columna
                                         </Button>
                                     </div>
                                     {table.foreignKeys && table.foreignKeys.length > 0 && (
                                         <div className="mt-4 pt-2 border-t border-border/50">
-                                            <p className="text-xs font-medium text-muted-foreground mb-2">Foreign Keys</p>
+                                            <p className="text-xs font-medium text-muted-foreground mb-2">Claves Foráneas</p>
                                             <div className="space-y-1">
                                                 {table.foreignKeys.map(fk => (
                                                     <div key={fk.name} className="flex items-center text-xs text-muted-foreground gap-2 font-mono">
@@ -327,29 +328,29 @@ export default function SchemaPage() {
 
   const getErrorMessage = (error: unknown): string => {
     if (error instanceof Error) return error.message;
-    return "An unknown error occurred.";
+    return "Ocurrió un error desconocido.";
   }
 
   const handleAnalyze = (cs: string) => {
     if (!cs.trim()) {
-      toast({ variant: "destructive", title: "Connection string is required." });
+      toast({ variant: "destructive", title: "La cadena de conexión es obligatoria." });
       return;
     }
 
     setLoading("analyze");
-    const { id } = toast({ title: "Analyzing schema...", duration: 999999 });
+    const { id } = toast({ title: "Analizando esquema...", duration: 999999 });
 
     analyzeSchema(cs)
       .then(data => {
         dismiss(id);
-        toast({ variant: "default", title: "Schema analysis complete.", duration: 3000 });
+        toast({ variant: "default", title: "Análisis de esquema completado.", duration: 3000 });
         setSchema(data);
         setConnectionOk(true);
       })
       .catch(err => {
         const errorMessage = getErrorMessage(err);
         dismiss(id);
-        toast({ variant: "destructive", title: "Schema analysis failed.", description: errorMessage, duration: 5000 });
+        toast({ variant: "destructive", title: "Falló el análisis de esquema.", description: errorMessage, duration: 5000 });
         setConnectionOk(false);
       })
       .finally(() => {
@@ -369,28 +370,28 @@ export default function SchemaPage() {
                     <Link href="/" className="w-full">
                       <SidebarMenuButton>
                           <Wand2 />
-                          Refactor
+                          Refactorizar
                       </SidebarMenuButton>
                     </Link>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
                       <SidebarMenuButton disabled>
                           <History />
-                          History
+                          Historial
                       </SidebarMenuButton>
                   </SidebarMenuItem>
                    <SidebarMenuItem>
                     <Link href="/schema" className="w-full">
                       <SidebarMenuButton isActive>
                           <Box />
-                          Schema
+                          Esquema
                       </SidebarMenuButton>
                     </Link>
                   </SidebarMenuItem>
                    <SidebarMenuItem>
                       <SidebarMenuButton disabled>
                           <SlidersHorizontal />
-                          Settings
+                          Configuración
                       </SidebarMenuButton>
                   </SidebarMenuItem>
               </SidebarMenu>
@@ -399,7 +400,7 @@ export default function SchemaPage() {
              <div className="p-2 border-t border-border">
                  <Button variant={connectionOk ? "secondary" : "outline"} className="w-full mt-2 justify-start gap-2" onClick={() => handleAnalyze(connectionString)}>
                       {loading === 'analyze' ? <Loader2 className="animate-spin" /> : <Power />}
-                      <span>{connectionOk === null ? "Check Connection" : connectionOk ? "Connection OK" : "Connection Failed"}</span>
+                      <span>{connectionOk === null ? "Probar Conexión" : connectionOk ? "Conexión OK" : "Conexión Fallida"}</span>
                  </Button>
               </div>
           </SidebarFooter>
@@ -408,11 +409,10 @@ export default function SchemaPage() {
          <header className="sticky top-0 z-10 w-full border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="container flex h-14 max-w-screen-2xl items-center">
                 <div className="mr-4 hidden md:flex">
-                  <h1 className="text-xl font-medium">Database Schema</h1>
+                  <h1 className="text-xl font-medium">Esquema de la Base de Datos</h1>
                 </div>
-                <SidebarTrigger className="md:hidden" />
                 <div className="flex flex-1 items-center justify-end space-x-4">
-                  <Badge variant="outline" className="text-xs font-normal">Development</Badge>
+                  <Badge variant="outline" className="text-xs font-normal">Desarrollo</Badge>
                   <Badge variant="secondary" className="text-xs font-normal flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-green-500"></span>
                     https://localhost:7040
@@ -426,11 +426,11 @@ export default function SchemaPage() {
               <div className="lg:col-span-1 flex flex-col gap-6">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="font-medium text-base">Connection</CardTitle>
+                        <CardTitle className="font-medium text-base">Conexión</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div>
-                            <Label htmlFor="connection-string" className="text-xs text-muted-foreground">Database Connection String</Label>
+                            <Label htmlFor="connection-string" className="text-xs text-muted-foreground">Cadena de Conexión de la Base de Datos</Label>
                             <Textarea
                               id="connection-string"
                               placeholder="server=myserver;Database=example;"
