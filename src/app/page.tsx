@@ -28,7 +28,8 @@ import {
   Settings,
   Pencil,
   Trash2,
-  FolderGit2
+  FolderGit2,
+  Link2
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import ResultsPanel from "@/components/refactor/ResultsPanel";
@@ -44,7 +45,21 @@ function ConnectionManager() {
     const context = useContext(DbSessionContext);
     if (!context) throw new Error("ConnectionManager must be used within a DbSessionProvider");
     
-    const { sessionId, expiresAt, disconnect, loading } = context;
+    const { sessionId, expiresAt, connect, disconnect, loading, error } = context;
+    const { toast } = useToast();
+    const [cs, setCs] = useState("");
+
+    const onConnect = async () => {
+        if (!cs.trim()) return;
+        try {
+          await connect(cs.trim(), 3600);
+          toast({ title: "Conexión exitosa", description: "La sesión está activa. Ya puedes explorar el esquema." });
+          setCs("");
+        } catch (err: any) {
+          toast({ variant: "destructive", title: "Error de conexión", description: err.message });
+        }
+    };
+
 
     if (sessionId) {
         return (
@@ -67,7 +82,34 @@ function ConnectionManager() {
             </Card>
         );
     }
-    return null;
+    
+    return (
+       <Card>
+            <CardHeader>
+                <CardTitle className="text-base font-medium">Conectar a Base de Datos</CardTitle>
+                 <CardDescription>Pega tu cadena de conexión para empezar.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="space-y-4">
+                    <Textarea
+                        id="connection-string"
+                        value={cs}
+                        onChange={(e) => setCs(e.target.value)}
+                        placeholder="Server=...;Database=...;User Id=...;Password=..."
+                        className="w-full h-28 p-2 rounded-md border font-mono text-xs bg-input"
+                        autoComplete="off"
+                        spellCheck={false}
+                        data-lpignore="true"
+                    />
+                    <Button onClick={onConnect} disabled={loading || !cs.trim()} className="w-full">
+                        {loading ? <Loader2 className="animate-spin mr-2" /> : <Link2 className="mr-2 h-4 w-4" />}
+                        Conectar de forma segura
+                    </Button>
+                    {error && <p className="text-sm text-destructive">{error}</p>}
+                </div>
+            </CardContent>
+        </Card>
+    );
 }
 
 function RepositoryManager() {
@@ -77,15 +119,16 @@ function RepositoryManager() {
                 <CardTitle className="text-base font-medium">Repositorio</CardTitle>
             </CardHeader>
             <CardContent>
-                <Label htmlFor="root-key" className="text-muted-foreground">Clave Raiz</Label>
-                <Select defaultValue="SOLUTION" disabled>
-                    <SelectTrigger className="mt-2 bg-input border-0">
-                        <SelectValue placeholder="Seleccionar..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="SOLUTION">SOLUTION</SelectItem>
-                    </SelectContent>
-                </Select>
+                 <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                        <FolderGit2 className="h-5 w-5 text-muted-foreground"/>
+                        <span className="font-medium">Repositorio Local</span>
+                    </div>
+                    <Badge variant="outline" className="text-green-400 border-green-400/50">Listo</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                    La ruta del código fuente está preconfigurada en el servidor.
+                </p>
             </CardContent>
         </Card>
     );
@@ -99,15 +142,15 @@ function OptionsManager({ options, setOptions }: { options: { useSynonyms: boole
             </CardHeader>
             <CardContent className="space-y-4 pt-2">
                 <div className="flex items-center justify-between">
-                    <Label htmlFor="use-synonyms">Usar Sinónimos</Label>
+                    <Label htmlFor="use-synonyms" className="text-sm">Usar Sinónimos</Label>
                     <Switch id="use-synonyms" checked={options.useSynonyms} onCheckedChange={(c) => setOptions((p: any) => ({...p, useSynonyms: c}))} />
                 </div>
                 <div className="flex items-center justify-between">
-                    <Label htmlFor="use-views">Usar Vistas</Label>
+                    <Label htmlFor="use-views" className="text-sm">Usar Vistas</Label>
                     <Switch id="use-views" checked={options.useViews} onCheckedChange={(c) => setOptions((p: any) => ({...p, useViews: c}))} />
                 </div>
                  <div className="flex items-center justify-between">
-                    <Label htmlFor="cqrs">CORS</Label>
+                    <Label htmlFor="cqrs" className="text-sm">CORS</Label>
                     <Switch id="cqrs" checked={options.cqrs} onCheckedChange={(c) => setOptions((p: any) => ({...p, cqrs: c}))} />
                 </div>
             </CardContent>
@@ -147,25 +190,25 @@ function PlanManager({ plan, setPlan }: { plan: RefactorPlan, setPlan: React.Dis
                         <Label className="text-xs text-muted-foreground">Añadir operacion</Label>
                         <div className="grid grid-cols-5 gap-2 mt-1">
                             <Select value={newOp.scope} onValueChange={v => setNewOp({...newOp, scope: v})}>
-                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                <SelectTrigger className="bg-input border-0 h-9"><SelectValue/></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="table">table</SelectItem>
                                     <SelectItem value="column">column</SelectItem>
                                 </SelectContent>
                             </Select>
-                            <Input placeholder="TableFrom" value={newOp.tableFrom} onChange={e => setNewOp({...newOp, tableFrom: e.target.value})} />
-                            <Input placeholder="ColumnFrom" value={newOp.columnFrom} onChange={e => setNewOp({...newOp, columnFrom: e.target.value})} disabled={newOp.scope !== 'column'} />
-                            <Input placeholder={newOp.scope === 'table' ? 'TableTo' : 'ColumnTo'} value={newOp.tableTo} onChange={e => setNewOp({...newOp, tableTo: e.target.value})} />
-                            <Button onClick={handleAddOperation} variant="outline">Añadir</Button>
+                            <Input placeholder="TableFrom" value={newOp.tableFrom} onChange={e => setNewOp({...newOp, tableFrom: e.target.value})} className="bg-input border-0 h-9"/>
+                            <Input placeholder="ColumnFrom" value={newOp.columnFrom} onChange={e => setNewOp({...newOp, columnFrom: e.target.value})} disabled={newOp.scope !== 'column'} className="bg-input border-0 h-9" />
+                            <Input placeholder={newOp.scope === 'table' ? 'TableTo' : 'ColumnTo'} value={newOp.tableTo} onChange={e => setNewOp({...newOp, tableTo: e.target.value})} className="bg-input border-0 h-9"/>
+                            <Button onClick={handleAddOperation} variant="outline" size="sm">Añadir</Button>
                         </div>
                     </div>
                     <div className="space-y-2">
                         {plan.renames.map((op, index) => (
-                             <div key={index} className="grid grid-cols-5 items-center gap-4 text-sm font-mono">
+                             <div key={index} className="grid grid-cols-5 items-center gap-4 text-sm font-mono p-1 rounded-md hover:bg-muted/50">
                                  <Badge variant="outline" className="w-20 justify-center">{op.scope}</Badge>
-                                 <span>{op.tableFrom}</span>
-                                 <span>{op.columnFrom ?? '-'}</span>
-                                 <span>{op.scope === 'table' ? op.tableTo : op.columnTo}</span>
+                                 <span className="truncate">{op.tableFrom}</span>
+                                 <span className="truncate">{op.columnFrom ?? '-'}</span>
+                                 <span className="truncate">{op.scope === 'table' ? op.tableTo : op.columnTo}</span>
                                  <div className="flex items-center justify-end">
                                     <Button variant="ghost" size="icon" className="h-7 w-7"><Pencil className="h-4 w-4"/></Button>
                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRemoveOperation(index)}><Trash2 className="h-4 w-4"/></Button>
@@ -193,7 +236,10 @@ function SchemaSummary({ onAnalyze, loading }: { onAnalyze: () => void, loading:
     return (
         <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base font-medium">Esquema</CardTitle>
+                <div>
+                    <CardTitle className="text-base font-medium">Esquema</CardTitle>
+                    <CardDescription className="text-xs">Resumen de la base de datos.</CardDescription>
+                </div>
                 <Button variant="outline" size="sm" onClick={onAnalyze} disabled={loading}>
                     {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Database className="mr-2 h-4 w-4"/>} Analizar
                 </Button>
@@ -229,70 +275,6 @@ function SchemaSummary({ onAnalyze, loading }: { onAnalyze: () => void, loading:
     );
 }
 
-
-function ConnectionView() {
-  const context = useContext(DbSessionContext);
-  if (!context) throw new Error("ConnectionView must be used within a DbSessionProvider");
-  
-  const { connect, loading, error } = context;
-  const [cs, setCs] = useState("");
-  const { toast } = useToast();
-  const [name, setName] = useState("");
-
-  useEffect(() => {
-    setName(`cs_${Math.random().toString(36).slice(2)}`);
-  }, []);
-
-  const onConnect = async () => {
-    if (!cs.trim()) return;
-    try {
-      await connect(cs.trim(), 3600);
-      toast({ title: "Conexión exitosa", description: "La sesión está activa. Ya puedes explorar el esquema." });
-      setCs("");
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Error de conexión", description: err.message });
-    }
-  };
-  
-  return (
-    <div className="flex flex-col items-center justify-center h-full gap-8">
-      <div className="flex flex-col items-center justify-center text-center max-w-lg w-full px-8">
-        <Database className="h-16 w-16 text-primary mb-4" />
-        <h2 className="text-2xl font-bold">Bienvenido a DRefactor</h2>
-        <p className="text-muted-foreground mt-2">
-          Para empezar, conéctate a tu base de datos para analizar el esquema y empezar a refactorizar.
-        </p>
-        <div className="w-full space-y-4 mt-8">
-          <Textarea
-            id="connection-string"
-            value={cs}
-            onChange={(e) => setCs(e.target.value)}
-            placeholder="Pega aquí tu cadena de conexión..."
-            className="w-full h-32 p-4 rounded-lg border font-mono text-sm bg-background"
-            autoComplete="off"
-            spellCheck={false}
-            name={name}
-            data-lpignore="true"
-            data-1p-ignore="true"
-          />
-          <Button
-            onClick={onConnect}
-            disabled={loading || !cs.trim()}
-            className="w-full text-base py-6 bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            {loading ? <Loader2 className="animate-spin" /> : <CheckCircle />}
-            Conectar de forma segura
-          </Button>
-          {error && (
-            <p className="mt-2 px-2 text-sm text-destructive">{error}</p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
 export default function RefactorPage() {
   const context = useContext(DbSessionContext);
   if (!context) throw new Error("RefactorPage must be used within a DbSessionProvider");
@@ -323,8 +305,8 @@ export default function RefactorPage() {
     onSuccess: (data: T) => void,
     toastMessages: { loading: string; success: string; error: string }
   ) => {
-    if (!sessionId) {
-      toast({ variant: "destructive", title: "La sesión no está activa." });
+    if (!sessionId && !['plan', 'codefix'].includes(loadingState)) {
+      toast({ variant: "destructive", title: "La sesión no está activa.", description: "Por favor, conéctate a una base de datos primero." });
       return;
     }
      if (plan.renames.length === 0 && !['analyze', 'cleanup'].includes(loadingState)) {
@@ -370,14 +352,13 @@ export default function RefactorPage() {
   );
 
   const handleRefactor = (apply: boolean) => {
-    if (!sessionId) return;
     if (apply) {
         setApplyAlertOpen(true);
         return;
     }
     
     handleApiCall(
-    () => runRefactor({ sessionId, plan, apply, rootKey, ...options }),
+    () => runRefactor({ sessionId: sessionId!, plan, apply, rootKey, ...options }),
     "preview",
     (data) => setResult(prev => ({ ...prev, ...data })),
     { 
@@ -463,11 +444,6 @@ export default function RefactorPage() {
       </Sidebar>
       <SidebarInset>
         <main className="flex-grow p-4 sm:p-6 lg:p-8 h-screen flex flex-col">
-            {!sessionId ? (
-                <div className="flex-1 min-h-0">
-                    <ConnectionView />
-                </div>
-            ) : (
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full items-start">
                 {/* Columna Izquierda */}
                 <div className="lg:col-span-1 flex flex-col gap-6">
@@ -490,10 +466,10 @@ export default function RefactorPage() {
                             <span className="ml-2">Generar SQL</span>
                         </Button>
                         <Button variant="outline" size="sm" onClick={handleCodefix} disabled={!!loading}>
-                            {loading === 'codefix' ? <Loader2 className="animate-spin h-4 w-4" /> : <FileCode className="h-4 w-4"/>}
+                            {loading === 'codefix' ? <Loader2 className="animate-spin h-4 w-4" /> : <FolderGit2 className="h-4 w-4"/>}
                             <span className="ml-2">Vista Previa Código</span>
                         </Button>
-                        <Button onClick={() => handleRefactor(true)} disabled={!!loading} className="ml-auto bg-primary text-primary-foreground">
+                        <Button onClick={() => handleRefactor(true)} disabled={!!loading} className="ml-auto bg-primary text-primary-foreground hover:bg-primary/90">
                             {loading === 'apply' ? <Loader2 className="animate-spin h-4 w-4" /> : <Play className="h-4 w-4"/>}
                             <span className="ml-2">Aplicar</span>
                         </Button>
@@ -509,7 +485,6 @@ export default function RefactorPage() {
                     </div>
                 </div>
              </div>
-            )}
         </main>
       </SidebarInset>
       
