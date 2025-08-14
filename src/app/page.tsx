@@ -48,7 +48,8 @@ import {
   Sparkles,
   Play,
   KeyRound,
-  Link2
+  Link2,
+  FolderGit2,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import ResultsPanel from "@/components/refactor/ResultsPanel";
@@ -589,7 +590,7 @@ export default function RefactorPage() {
                     </CardHeader>
                     <CardContent>
                         <div>
-                            <Label htmlFor="connection-string" className="text-xs text-muted-foreground">Connection String</Label>
+                            <Label htmlFor="connection-string" className="text-xs text-muted-foreground">Database Connection String</Label>
                             <Textarea
                               id="connection-string"
                               placeholder="server=myserver;Database=example;"
@@ -598,6 +599,24 @@ export default function RefactorPage() {
                               onChange={(e) => setConnectionString(e.target.value)}
                               className="font-mono text-sm mt-1 bg-background"
                             />
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                      <CardTitle className="font-medium text-base">Codebase</CardTitle>
+                    </CardHeader>
+                     <CardContent>
+                        <div>
+                            <Label htmlFor="root-key" className="text-xs text-muted-foreground">Root Key</Label>
+                             <Input
+                                id="root-key"
+                                placeholder="SOLUTION"
+                                value={rootKey}
+                                onChange={(e) => setRootKey(e.target.value)}
+                                className="font-mono text-sm mt-1 bg-background"
+                             />
+                             <p className="text-xs text-muted-foreground mt-2">The key for the project root path to apply code changes (e.g., SOLUTION, FRONTEND).</p>
                         </div>
                     </CardContent>
                 </Card>
@@ -613,7 +632,7 @@ export default function RefactorPage() {
                                 <Tooltip>
                                   <TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground cursor-help" /></TooltipTrigger>
                                   <TooltipContent>
-                                    <p className="max-w-xs">Crea sinónimos para los objetos renombrados, permitiendo que el código antiguo siga funcionando temporalmente.</p>
+                                    <p className="max-w-xs">Creates synonyms for renamed objects, allowing old code to continue working temporarily.</p>
                                   </TooltipContent>
                                 </Tooltip>
                             </Label>
@@ -625,7 +644,7 @@ export default function RefactorPage() {
                                  <Tooltip>
                                   <TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground cursor-help" /></TooltipTrigger>
                                   <TooltipContent>
-                                    <p className="max-w-xs">Crea vistas de solo lectura para las tablas antiguas, asegurando la compatibilidad con aplicaciones que solo leen datos.</p>
+                                    <p className="max-w-xs">Creates read-only views for old tables, ensuring compatibility with applications that only read data.</p>
                                   </TooltipContent>
                                 </Tooltip>
                             </Label>
@@ -633,11 +652,11 @@ export default function RefactorPage() {
                         </div>
                         <div className="flex items-center justify-between">
                              <Label htmlFor="cqrs" className="text-sm font-light flex items-center gap-2">
-                                CORS
+                                CQRS
                                  <Tooltip>
                                   <TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground cursor-help" /></TooltipTrigger>
                                   <TooltipContent>
-                                    <p className="max-w-xs">Habilita la compatibilidad con CQRS (Command Query Responsibility Segregation) creando vistas para lectura.</p>
+                                    <p className="max-w-xs">Enables Command Query Responsibility Segregation (CQRS) compatibility by creating views for reading.</p>
                                   </TooltipContent>
                                 </Tooltip>
                              </Label>
@@ -650,7 +669,7 @@ export default function RefactorPage() {
                                  <Tooltip>
                                   <TooltipTrigger asChild><Info className="h-3 w-3 text-destructive cursor-help" /></TooltipTrigger>
                                   <TooltipContent>
-                                    <p className="max-w-xs">Permite la ejecución de operaciones destructivas como DROP TABLE y DROP COLUMN. Usar con precaución.</p>
+                                    <p className="max-w-xs">Allows the execution of destructive operations like DROP TABLE and DROP COLUMN. Use with caution.</p>
                                   </TooltipContent>
                                 </Tooltip>
                             </Label>
