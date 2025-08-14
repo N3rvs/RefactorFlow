@@ -29,7 +29,9 @@ import {
   Play,
   DatabaseZap,
   Circle,
-  Link2
+  Link2,
+  Github,
+  GitBranch
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import ResultsPanel from "@/components/refactor/ResultsPanel";
@@ -44,79 +46,82 @@ function ConnectionManager() {
     const context = useContext(DbSessionContext);
     if (!context) throw new Error("ConnectionManager must be used within a DbSessionProvider");
     
-    const { sessionId, connect, loading, error } = context;
+    const { sessionId, connect, loading, error, disconnect, sessionLoading } = context;
     const [cs, setCs] = useState("");
-    const [isConnecting, setIsConnecting] = useState(false);
     const { toast } = useToast();
     const [name, setName] = useState("");
 
     useEffect(() => {
-        // This ensures the random name is only generated on the client, avoiding hydration mismatches.
         setName(`cs_${Math.random().toString(36).slice(2)}`);
     }, []);
 
     const onConnect = async () => {
         if (!cs.trim()) return;
-        setIsConnecting(true);
         try {
             await connect(cs.trim(), 3600);
             toast({ title: "Conexión exitosa", description: "La sesión está activa. Ya puedes explorar el esquema." });
-            setCs(""); // Limpiar input
+            setCs("");
         } catch (err: any) {
             toast({ variant: "destructive", title: "Error de conexión", description: err.message });
-        } finally {
-            setIsConnecting(false);
         }
     };
     
     if (sessionId) {
-        return null; // Don't show anything in the main panel if connected
+        return (
+             <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm p-2">
+                  <div className={`flex items-center gap-2 ${sessionId ? 'text-green-400' : 'text-muted-foreground'}`}>
+                     <Circle className={`h-3 w-3 fill-current`} />
+                     <span>{sessionId ? 'Conectado' : 'Desconectado'}</span>
+                  </div>
+                </div>
+                <Button variant="outline" className="w-full" onClick={disconnect} disabled={!sessionId || sessionLoading}>
+                     {sessionLoading ? <Loader2 className="animate-spin" /> : <Power />}
+                     Desconectar
+                </Button>
+             </div>
+        );
     }
 
     return (
-        <div className="flex flex-col items-center justify-center h-full gap-8">
-             <div className="flex flex-col items-center justify-center text-center">
-                <DatabaseZap className="h-16 w-16 text-primary mb-4" />
-                <h2 className="text-2xl font-bold">Bienvenido a DB Refactor</h2>
-                <p className="text-muted-foreground mt-2 max-w-md">
-                    Para empezar, por favor introduce la cadena de conexión a tu base de datos. La conexión es efímera y segura.
-                </p>
-            </div>
-            <Card className="w-full max-w-lg">
-                <CardHeader>
-                    <CardTitle className="font-medium text-base flex items-center gap-2">
-                        <Power className="h-4 w-4" />
-                        Conectar a la Base de Datos
-                    </CardTitle>
-                    <CardDescription>
-                        Tu cadena de conexión se usa una sola vez para crear una sesión segura y no se almacena.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        <Textarea
-                            id="connection-string"
-                            value={cs}
-                            onChange={(e) => setCs(e.target.value)}
-                            placeholder="Pega aquí tu cadena de conexión..."
-                            className="w-full h-24 p-2 rounded border font-mono text-sm"
-                            autoComplete="off"
-                            spellCheck={false}
-                            name={name}
-                            data-lpignore="true" data-1p-ignore="true"
-                        />
-                        <Button onClick={onConnect} disabled={isConnecting || !cs.trim()} className="w-full">
-                            {isConnecting ? <Loader2 className="animate-spin" /> : <Link2 />}
-                            Conectar
-                        </Button>
-                    </div>
-                    {error && (
-                        <p className="mt-2 text-xs text-destructive">{error}</p>
-                    )}
-                </CardContent>
-            </Card>
+        <div className="space-y-4 p-2">
+            <h3 className="text-sm font-medium px-2">Conectar a Base de Datos</h3>
+            <Textarea
+                id="connection-string"
+                value={cs}
+                onChange={(e) => setCs(e.target.value)}
+                placeholder="Pega aquí tu cadena de conexión..."
+                className="w-full h-24 p-2 rounded border font-mono text-sm bg-background"
+                autoComplete="off"
+                spellCheck={false}
+                name={name}
+                data-lpignore="true" data-1p-ignore="true"
+            />
+            <Button onClick={onConnect} disabled={loading || !cs.trim()} className="w-full">
+                {loading ? <Loader2 className="animate-spin" /> : <Link2 />}
+                Conectar
+            </Button>
+            {error && (
+                <p className="mt-2 px-2 text-xs text-destructive">{error}</p>
+            )}
         </div>
     );
+}
+
+function RepositoryManager() {
+    return (
+        <div className="space-y-4 p-2">
+            <h3 className="text-sm font-medium px-2">Repositorio de Código</h3>
+            <div className="p-2 rounded-lg bg-muted/50 text-sm text-muted-foreground text-center">
+                <Github className="mx-auto h-8 w-8 mb-2"/>
+                <p>Aún no has conectado un repositorio.</p>
+            </div>
+             <Button variant="outline" className="w-full">
+                <GitBranch className="mr-2 h-4 w-4"/>
+                Conectar Repositorio
+            </Button>
+        </div>
+    )
 }
 
 export default function RefactorPage() {
@@ -159,7 +164,7 @@ export default function RefactorPage() {
 
     setLoading(loadingState);
     if(loadingState !== 'plan' && loadingState !== 'codefix') {
-      setResult(null); // Clear previous results only for DB operations
+      setResult(null);
     }
     const { id } = toast({ title: toastMessages.loading, duration: 999999 });
 
@@ -230,37 +235,22 @@ export default function RefactorPage() {
 
   const MainContent = () => {
     if (!sessionId) {
-        return <ConnectionManager />;
+        return (
+            <div className="flex flex-col items-center justify-center h-full gap-8">
+                <div className="flex flex-col items-center justify-center text-center">
+                    <DatabaseZap className="h-16 w-16 text-primary mb-4" />
+                    <h2 className="text-2xl font-bold">Bienvenido a DB Refactor</h2>
+                    <p className="text-muted-foreground mt-2 max-w-md">
+                        Para empezar, conecta una base de datos desde el panel lateral.
+                    </p>
+                </div>
+            </div>
+        );
     }
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
             <div className="lg:col-span-1 flex flex-col gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base font-medium flex items-center gap-2"><Power className="h-4 w-4" /> Conexión</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                       <div className="flex items-center justify-between text-sm">
-                         <div className="flex items-center gap-2 text-green-400">
-                           <CheckCircle className="h-4 w-4" />
-                           <span>Conectado</span>
-                         </div>
-                         <Button variant="ghost" size="sm" onClick={disconnect} disabled={sessionLoading}>
-                            {sessionLoading ? <Loader2 className="animate-spin h-3 w-3"/> : "Desconectar"}
-                         </Button>
-                       </div>
-                    </CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base font-medium flex items-center gap-2"><Database className="h-4 w-4" /> Repositorio</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                       <p className="text-sm text-muted-foreground">No configurado.</p>
-                       <Button variant="outline" size="sm" className="mt-2">Configurar</Button>
-                    </CardContent>
-                </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base font-medium">Opciones</CardTitle>
@@ -312,18 +302,9 @@ export default function RefactorPage() {
               </SidebarMenu>
           </SidebarContent>
            <SidebarFooter>
-             <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm p-2">
-                  <div className={`flex items-center gap-2 ${sessionId ? 'text-green-400' : 'text-muted-foreground'}`}>
-                     <Circle className={`h-3 w-3 fill-current`} />
-                     <span>{sessionId ? 'Conectado' : 'Desconectado'}</span>
-                  </div>
-                </div>
-                <Button variant="outline" className="w-full" onClick={disconnect} disabled={!sessionId || sessionLoading}>
-                     {sessionLoading ? <Loader2 className="animate-spin" /> : <Power />}
-                     Desconectar
-                </Button>
-             </div>
+             <RepositoryManager />
+             <div className="my-4 border-t border-sidebar-border -mx-4"></div>
+             <ConnectionManager />
            </SidebarFooter>
       </Sidebar>
       <SidebarInset>
@@ -335,11 +316,11 @@ export default function RefactorPage() {
                     </CardContent>
                 </Card>
                  <div className="flex items-center gap-2">
-                    <Button onClick={() => handleRefactor(true)} disabled={loading === 'apply' || plan.renames.length === 0} className="bg-destructive hover:bg-destructive/90">
+                    <Button onClick={() => handleRefactor(true)} disabled={loading === 'apply' || !sessionId || plan.renames.length === 0} className="bg-destructive hover:bg-destructive/90">
                         <Play className="mr-2"/>
                         Aplicar Cambios
                     </Button>
-                    <Button variant="outline" onClick={triggerCleanup} disabled={loading === 'cleanup' || plan.renames.length === 0}>
+                    <Button variant="outline" onClick={triggerCleanup} disabled={loading === 'cleanup' || !sessionId || plan.renames.length === 0}>
                         <Trash2 className="mr-2"/>
                         Limpieza
                     </Button>
@@ -347,21 +328,21 @@ export default function RefactorPage() {
             </header>
              <div className="bg-muted/30 p-2 rounded-lg mb-6">
                 <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleRefactor(false)} disabled={loading === 'preview' || plan.renames.length === 0}>
+                      <Button variant="outline" size="sm" onClick={() => handleRefactor(false)} disabled={loading === 'preview' || !sessionId || plan.renames.length === 0}>
                           {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
                           Vista Previa DB
                       </Button>
-                       <Button variant="outline" size="sm" onClick={handlePlan} disabled={loading === 'plan' || plan.renames.length === 0}>
+                       <Button variant="outline" size="sm" onClick={handlePlan} disabled={loading === 'plan' || !sessionId || plan.renames.length === 0}>
                           {loading === 'plan' ? <Loader2 className="animate-spin" /> : <FileText/>}
                           Generar SQL
                       </Button>
-                       <Button variant="outline" size="sm" onClick={() => handleCodefix(false)} disabled={loading === 'codefix' || plan.renames.length === 0}>
+                       <Button variant="outline" size="sm" onClick={() => handleCodefix(false)} disabled={loading === 'codefix' || !sessionId || plan.renames.length === 0}>
                           {loading === 'codefix' ? <Loader2 className="animate-spin" /> : <FileCode/>}
                           Vista Previa Código
                       </Button>
                  </div>
              </div>
-            <div className="flex-1">
+            <div className="flex-1 min-h-0">
                 <MainContent />
             </div>
         </main>
@@ -397,3 +378,5 @@ export default function RefactorPage() {
     </div>
   );
 }
+
+    
