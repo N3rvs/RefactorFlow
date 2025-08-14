@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import type { RefactorPlan, RefactorResponse, CleanupRequest, RefactorRequest, SchemaResponse, RenameOperation, PlanRequest, Table, Column } from "@/lib/types";
 import { runRefactor, runCleanup, analyzeSchema, generatePlan, runCodeFix } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -407,10 +407,6 @@ export default function SchemaPage() {
                 </div>
                 <div className="flex flex-1 items-center justify-end space-x-4">
                   <Badge variant="outline" className="text-xs font-normal">Desarrollo</Badge>
-                  <Badge variant="secondary" className="text-xs font-normal flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                    https://localhost:7040
-                  </Badge>
                 </div>
             </div>
         </header>
