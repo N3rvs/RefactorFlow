@@ -10,7 +10,6 @@ import Link from 'next/link';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -27,15 +26,17 @@ import {
   Eye,
   FileCode,
   Play,
-  DatabaseZap,
-  Circle,
-  Link2,
-  FolderGit2,
+  Settings,
+  Pencil,
+  PlusCircle,
+  XCircle,
+  FolderGit2
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import ResultsPanel from "@/components/refactor/ResultsPanel";
 import { cn } from "@/lib/utils";
 import { useDbSession, DbSessionContext } from "@/hooks/useDbSession";
+import { Textarea } from "@/components/ui/textarea";
 
 const initialPlan: RefactorPlan = {
   renames: [],
@@ -45,66 +46,130 @@ function ConnectionManager() {
     const context = useContext(DbSessionContext);
     if (!context) throw new Error("ConnectionManager must be used within a DbSessionProvider");
     
-    const { sessionId, loading, disconnect } = context;
-    
+    const { sessionId, expiresAt, disconnect, loading } = context;
+
     if (sessionId) {
         return (
-             <div className="space-y-2 p-2">
-                <h3 className="text-sm font-medium px-2">Conexión</h3>
-                <div className="p-3 rounded-lg bg-muted/50 text-sm">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-green-500/20 rounded-full">
-                           <CheckCircle className="h-5 w-5 text-green-400"/>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-base font-medium">Conexión</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-green-400">
+                           <CheckCircle className="h-4 w-4"/>
+                           <span className="text-sm">Conectado</span>
                         </div>
-                        <div>
-                            <p className="font-semibold">Conectado</p>
-                            <p className="text-muted-foreground text-xs">La sesión está activa.</p>
-                        </div>
+                        <Button variant="ghost" size="sm" onClick={disconnect} disabled={loading}>
+                           {loading ? <Loader2 className="h-4 w-4 animate-spin"/> : "Desconectar"}
+                        </Button>
                     </div>
-                </div>
-                <Button variant="outline" className="w-full" onClick={disconnect} disabled={loading}>
-                     {loading ? <Loader2 className="animate-spin" /> : <Power />}
-                     Desconectar
-                </Button>
-             </div>
+                    {expiresAt && <p className="text-xs text-muted-foreground mt-2">La sesión expira a las {new Date(expiresAt).toLocaleTimeString()}</p>}
+                </CardContent>
+            </Card>
         );
     }
-
-    return (
-      <div className="space-y-2 p-2">
-        <h3 className="text-sm font-medium px-2">Conectar a Base de Datos</h3>
-        <div className="p-3 rounded-lg bg-muted/50 text-sm">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-destructive/20 rounded-full">
-              <Power className="h-5 w-5 text-destructive/80" />
-            </div>
-            <div>
-              <p className="font-semibold">Desconectado</p>
-              <p className="text-muted-foreground text-xs">
-                Inicia una sesión para empezar.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return null;
 }
 
 function RepositoryManager() {
     return (
-        <div className="space-y-2 p-2">
-            <h3 className="text-sm font-medium px-2">Repositorio de Código</h3>
-            <div className="p-3 rounded-lg bg-muted/50 text-sm">
-                <div className="flex items-center gap-3">
-                    <FolderGit2 className="h-8 w-8 text-primary"/>
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-base font-medium">Repositorio</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <Label htmlFor="root-key">Clave Raiz</Label>
+                <Input id="root-key" readOnly value="SOLUTION" className="mt-2 bg-input"/>
+            </CardContent>
+        </Card>
+    );
+}
+
+function OptionsManager({ options, setOptions }) {
+     return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-base font-medium">Opciones</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <Label htmlFor="use-synonyms">Usar Sinónimos</Label>
+                    <Switch id="use-synonyms" checked={options.useSynonyms} onCheckedChange={(c) => setOptions(p => ({...p, useSynonyms: c}))} />
+                </div>
+                <div className="flex items-center justify-between">
+                    <Label htmlFor="use-views">Usar Vistas</Label>
+                    <Switch id="use-views" checked={options.useViews} onCheckedChange={(c) => setOptions(p => ({...p, useViews: c}))} />
+                </div>
+                 <div className="flex items-center justify-between">
+                    <Label htmlFor="cqrs">CORS</Label>
+                    <Switch id="cqrs" checked={options.cqrs} onCheckedChange={(c) => setOptions(p => ({...p, cqrs: c}))} />
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function PlanManager({ plan, setPlan }) {
+    // Dummy state for new operation form
+    const [newOp, setNewOp] = useState({ scope: 'column', tableFrom: '', columnFrom: '', tableTo: '' });
+
+    const handleAddOperation = () => {
+        if (!newOp.tableFrom) return; // Add more validation as needed
+        const op: RenameOperation = {
+            scope: newOp.scope as any,
+            tableFrom: newOp.tableFrom,
+            ...(newOp.scope === 'column' && { columnFrom: newOp.columnFrom, columnTo: newOp.tableTo }),
+            ...(newOp.scope === 'table' && { tableTo: newOp.tableTo }),
+        };
+        setPlan(prev => ({ ...prev, renames: [...prev.renames, op] }));
+        // Reset form
+        setNewOp({ scope: 'column', tableFrom: '', columnFrom: '', tableTo: '' });
+    };
+
+    const handleRemoveOperation = (index: number) => {
+        setPlan(prev => ({ ...prev, renames: prev.renames.filter((_, i) => i !== index) }));
+    };
+    
+    return (
+        <Card className="flex-1">
+            <CardHeader>
+                <CardTitle>Plan de Refactorización</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="space-y-4">
                     <div>
-                        <p className="font-semibold">Listo</p>
-                        <p className="text-muted-foreground text-xs">Ruta preconfigurada en servidor.</p>
+                        <Label className="text-xs text-muted-foreground">Añadir operacion</Label>
+                        <div className="grid grid-cols-5 gap-2 mt-1">
+                            {/* This is a simplified form. A real one would use selects and better state management */}
+                            <Input placeholder="Scope" value={newOp.scope} onChange={e => setNewOp({...newOp, scope: e.target.value})} />
+                            <Input placeholder="TableFrom" value={newOp.tableFrom} onChange={e => setNewOp({...newOp, tableFrom: e.target.value})} />
+                            <Input placeholder="ColumnFrom" value={newOp.columnFrom} onChange={e => setNewOp({...newOp, columnFrom: e.target.value})} disabled={newOp.scope !== 'column'} />
+                            <Input placeholder="TableTo/ColumnTo" value={newOp.tableTo} onChange={e => setNewOp({...newOp, tableTo: e.target.value})} />
+                            <Button onClick={handleAddOperation}>Añadir</Button>
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        {plan.renames.map((op, index) => (
+                             <div key={index} className="flex items-center justify-between bg-muted/50 p-2 rounded-md text-sm">
+                                <div className="flex items-center gap-4 font-mono text-xs">
+                                    <Badge variant="outline" className="w-20 justify-center">{op.scope}</Badge>
+                                    <span>{op.scope === 'table' ? `${op.tableFrom} -> ${op.tableTo}` : `${op.tableFrom}.${op.columnFrom} -> ${op.columnTo}`}</span>
+                                </div>
+                                <div className="flex items-center">
+                                    <Button variant="ghost" size="icon" className="h-6 w-6"><Pencil className="h-4 w-4"/></Button>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveOperation(index)}><Trash2 className="h-4 w-4"/></Button>
+                                </div>
+                             </div>
+                        ))}
+                         {plan.renames.length === 0 && (
+                            <p className="text-sm text-muted-foreground text-center py-4">No hay operaciones en el plan.</p>
+                        )}
                     </div>
                 </div>
-            </div>
-        </div>
-    )
+            </CardContent>
+        </Card>
+    );
 }
 
 function ConnectionView() {
@@ -132,12 +197,12 @@ function ConnectionView() {
   };
   
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-8 bg-card border rounded-lg">
+    <div className="flex flex-col items-center justify-center h-full gap-8">
       <div className="flex flex-col items-center justify-center text-center max-w-lg w-full px-8">
-        <DatabaseZap className="h-16 w-16 text-primary mb-4" />
-        <h2 className="text-2xl font-bold">Bienvenido a DB Refactor Toolkit</h2>
+        <Database className="h-16 w-16 text-primary mb-4" />
+        <h2 className="text-2xl font-bold">Bienvenido a DRefactor</h2>
         <p className="text-muted-foreground mt-2">
-          Para empezar, pega tu cadena de conexión a la base de datos y establece una sesión segura.
+          Para empezar, conéctate a tu base de datos para analizar el esquema y empezar a refactorizar.
         </p>
         <div className="w-full space-y-4 mt-8">
           <Textarea
@@ -155,9 +220,9 @@ function ConnectionView() {
           <Button
             onClick={onConnect}
             disabled={loading || !cs.trim()}
-            className="w-full text-base py-6"
+            className="w-full text-base py-6 bg-green-600 hover:bg-green-700 text-white"
           >
-            {loading ? <Loader2 className="animate-spin" /> : <Link2 />}
+            {loading ? <Loader2 className="animate-spin" /> : <CheckCircle />}
             Conectar de forma segura
           </Button>
           {error && (
@@ -279,36 +344,6 @@ export default function RefactorPage() {
     }
   );
 
-  const MainContent = () => {
-      return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-            <div className="lg:col-span-1 flex flex-col gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base font-medium">Opciones</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4 pt-4">
-                        <div className="flex items-center justify-between">
-                            <Label htmlFor="use-synonyms" className="text-sm">Usar Sinónimos</Label>
-                            <Switch id="use-synonyms" checked={options.useSynonyms} onCheckedChange={(c) => setOptions(p => ({...p, useSynonyms: c}))} />
-                        </div>
-                         <div className="flex items-center justify-between">
-                            <Label htmlFor="use-views" className="text-sm">Usar Vistas</Label>
-                            <Switch id="use-views" checked={options.useViews} onCheckedChange={(c) => setOptions(p => ({...p, useViews: c}))} />
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <div className="lg:col-span-2 flex flex-col gap-6">
-                 <div className="flex-1">
-                    <ResultsPanel result={result} loading={!!loading && loading !== 'analyze'} error={result?.error || null} />
-                 </div>
-            </div>
-        </div>
-    );
-  };
-
   return (
     <div className="flex min-h-screen bg-background text-foreground font-sans">
       <Sidebar>
@@ -327,63 +362,74 @@ export default function RefactorPage() {
                       <Link href="/schema" asChild>
                         <SidebarMenuButton>
                            <Database />
-                           Explorar Esquema
+                           Esquema
                         </SidebarMenuButton>
                       </Link>
                   </SidebarMenuItem>
+                   <SidebarMenuItem>
+                      <SidebarMenuButton>
+                         <Settings />
+                         Ajustes
+                      </SidebarMenuButton>
+                  </SidebarMenuItem>
               </SidebarMenu>
           </SidebarContent>
-           <SidebarFooter>
-             <RepositoryManager />
-             <div className="my-4 border-t border-sidebar-border -mx-4"></div>
-             <ConnectionManager />
-           </SidebarFooter>
       </Sidebar>
       <SidebarInset>
         <main className="flex-grow p-4 sm:p-6 lg:p-8 h-screen flex flex-col">
-            {sessionId ? (
-              <>
-                <header className="flex items-center justify-between mb-6">
-                    <Card className="flex-1 mr-4">
-                        <CardContent className="p-2">
-                            <Input placeholder="Describe tu plan de refactorización o edita el esquema directamente..." className="border-none focus-visible:ring-0 text-base" />
-                        </CardContent>
-                    </Card>
-                     <div className="flex items-center gap-2">
-                        <Button onClick={() => handleRefactor(true)} disabled={loading === 'apply' || !sessionId || plan.renames.length === 0} className="bg-destructive hover:bg-destructive/90">
-                            <Play className="mr-2"/>
-                            Aplicar Cambios
-                        </Button>
-                        <Button variant="outline" onClick={triggerCleanup} disabled={loading === 'cleanup' || !sessionId || plan.renames.length === 0}>
-                            <Trash2 className="mr-2"/>
-                            Limpieza
-                        </Button>
-                    </div>
-                </header>
-                 <div className="bg-muted/30 p-2 rounded-lg mb-6">
-                    <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleRefactor(false)} disabled={loading === 'preview' || !sessionId || plan.renames.length === 0}>
-                              {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
-                              Vista Previa DB
-                          </Button>
-                           <Button variant="outline" size="sm" onClick={handlePlan} disabled={loading === 'plan' || !sessionId || plan.renames.length === 0}>
-                              {loading === 'plan' ? <Loader2 className="animate-spin" /> : <FileText/>}
-                              Generar SQL
-                          </Button>
-                           <Button variant="outline" size="sm" onClick={() => handleCodefix(false)} disabled={loading === 'codefix' || !sessionId || plan.renames.length === 0}>
-                              {loading === 'codefix' ? <Loader2 className="animate-spin" /> : <FileCode/>}
-                              Vista Previa Código
-                          </Button>
-                     </div>
-                 </div>
-                <div className="flex-1 min-h-0">
-                    <MainContent />
-                </div>
-              </>
-            ) : (
+            {!sessionId ? (
                 <div className="flex-1 min-h-0">
                     <ConnectionView />
                 </div>
+            ) : (
+             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+                {/* Columna Izquierda */}
+                <div className="lg:col-span-1 flex flex-col gap-6">
+                    <ConnectionManager/>
+                    <RepositoryManager/>
+                    <OptionsManager options={options} setOptions={setOptions}/>
+                </div>
+
+                {/* Columna Derecha */}
+                <div className="lg:col-span-2 flex flex-col gap-6">
+                    <PlanManager plan={plan} setPlan={setPlan}/>
+
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => handleRefactor(false)} disabled={!sessionId || plan.renames.length === 0 || !!loading}>
+                            {loading === 'preview' ? <Loader2 className="animate-spin" /> : <Eye/>}
+                            Vista Previa BD
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={handlePlan} disabled={!sessionId || plan.renames.length === 0 || !!loading}>
+                            {loading === 'plan' ? <Loader2 className="animate-spin" /> : <FileText/>}
+                            Generar SQL
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleCodefix(false)} disabled={!sessionId || plan.renames.length === 0 || !!loading}>
+                            {loading === 'codefix' ? <Loader2 className="animate-spin" /> : <FileCode/>}
+                            Vista Previa Código
+                        </Button>
+                        <Button onClick={() => handleRefactor(true)} disabled={!sessionId || plan.renames.length === 0 || !!loading} className="ml-auto">
+                            {loading === 'apply' ? <Loader2 className="animate-spin" /> : <Play />}
+                            Aplicar
+                        </Button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-6 flex-1">
+                        <div className="flex flex-col">
+                           <ResultsPanel result={result} loading={!!loading} error={result?.error || null} />
+                        </div>
+                        <Card>
+                            <CardHeader className="flex flex-row justify-between items-center">
+                                <CardTitle className="text-base font-medium">Esquema</CardTitle>
+                                <Button variant="outline" size="sm"><Database className="mr-2 h-4 w-4"/> Analizar</Button>
+                            </CardHeader>
+                            <CardContent>
+                                {/* Schema summary table would go here */}
+                                <p className="text-sm text-muted-foreground">Analiza el esquema para ver las tablas.</p>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
+             </div>
             )}
         </main>
       </SidebarInset>
@@ -418,5 +464,3 @@ export default function RefactorPage() {
     </div>
   );
 }
-
-    

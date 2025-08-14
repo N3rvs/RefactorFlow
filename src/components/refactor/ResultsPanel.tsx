@@ -38,7 +38,7 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
       return <LoadingSkeleton />;
     }
 
-    if (error && !result) {
+    if (error) {
       return (
         <Alert variant="destructive" className="m-4">
           <AlertTriangle className="h-4 w-4" />
@@ -50,11 +50,9 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
     
     if (!result) {
         return (
-            <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full bg-card rounded-lg border">
-                <DatabaseZap className="mx-auto h-12 w-12" />
-                <h3 className="mt-4 text-lg font-medium">Listo para refactorizar</h3>
-                <p className="mt-1 text-sm">Los resultados de tus acciones aparecerán aquí.</p>
-            </div>
+            <Card className="flex flex-col items-center justify-center text-center text-muted-foreground h-full">
+                <p className="text-sm">Resultados de la operación</p>
+            </Card>
         );
     }
 
@@ -63,148 +61,51 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
 
     return (
       <Card className="h-full">
-      <Tabs defaultValue="summary" className="w-full h-full flex flex-col">
-        <div className="px-6 pt-4">
-          <TabsList className="grid w-full grid-cols-4 bg-muted/50">
-            <TabsTrigger value="summary">Resumen</TabsTrigger>
+      <Tabs defaultValue="sql" className="w-full h-full flex flex-col">
+        <div className="px-4 pt-4">
+          <TabsList className="grid w-full grid-cols-3 bg-muted/50">
             <TabsTrigger value="sql">SQL</TabsTrigger>
             <TabsTrigger value="codefix">CodeFix</TabsTrigger>
             <TabsTrigger value="logs">Logs</TabsTrigger>
           </TabsList>
         </div>
-        <div className="flex-1 overflow-y-auto">
-        <TabsContent value="summary" className="p-6">
-            <div className="border rounded-md">
-                <div className="p-4 border-b flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                         <span className={`w-2 h-2 mr-2 rounded-full ${result.ok ? 'bg-green-500' : 'bg-destructive'}`}></span>
-                         <p className="font-medium text-sm">Resumen</p> 
-                         <Badge variant={result.ok ? "default" : "destructive"} className={`text-xs ${result.ok ? 'bg-green-500/20 text-green-300 border-green-500/30' : ''}`}>
-                            {result.ok ? "éxito" : "fallido"}
-                         </Badge>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>{result.apply ? "Aplicado" : "Vista Previa"}</span>
-                        <ChevronRight className="h-4 w-4" />
-                    </div>
-                </div>
-                <div className="p-4">
-                   {codefix && (
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Archivo</span>
-                        <span className="font-mono">{changedFile?.path.split('/').pop() || 'N/A'}</span>
-                      </div>
-                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Modificado</span>
-                        <Badge variant="outline" className={changedFile ? "text-green-400 border-green-500/30 bg-green-500/10" : ""}>
-                          {changedFile ? <CheckCircle className="h-3 w-3 mr-1"/> : null}
-                          <span>{changedFile ? 'Sí' : 'No'}</span>
-                        </Badge>
-                      </div>
-                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Vista Previa</span>
-                         <button 
-                            className="text-muted-foreground hover:text-foreground text-xs flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled={!changedFile}
-                            onClick={() => changedFile && setSelectedFile(changedFile)}
-                         >
-                           <Eye className="h-3 w-3"/> Ver
-                         </button>
-                      </div>
-                    </div>
-                   )}
-                   {error && (
-                     <Alert variant="destructive" className="mt-4">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Error de Operación</AlertTitle>
-                        <AlertDescription><pre className="whitespace-pre-wrap font-mono text-xs">{error}</pre></AlertDescription>
-                    </Alert>
-                   )}
-                   {!codefix && !error && (
-                     <p className="text-sm text-muted-foreground text-center py-4">No hay resumen disponible.</p>
-                   )}
-                </div>
-            </div>
+        <div className="flex-1 overflow-y-auto p-4">
+        <TabsContent value="sql" className="m-0">
+          <div className="space-y-2">
+            <CodeBlock code={sql?.renameSql} />
+            <CodeBlock code={sql?.compatSql} />
+          </div>
         </TabsContent>
-        <TabsContent value="sql" className="p-6">
-            <Tabs defaultValue="rename" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="rename">Renombrar</TabsTrigger>
-                    <TabsTrigger value="compat">Compatibilidad</TabsTrigger>
-                    <TabsTrigger value="cleanup">Limpieza</TabsTrigger>
-                </TabsList>
-                <div className="mt-4 border rounded-md">
-                  <TabsContent value="rename" className="m-0"><CodeBlock code={sql?.renameSql} /></TabsContent>
-                  <TabsContent value="compat" className="m-0"><CodeBlock code={sql?.compatSql} /></TabsContent>
-                  <TabsContent value="cleanup" className="m-0"><CodeBlock code={sql?.cleanupSql} /></TabsContent>
-                </div>
-            </Tabs>
-        </TabsContent>
-        <TabsContent value="codefix" className="p-6">
+        <TabsContent value="codefix" className="m-0">
             {codefix ? (
-              <div className="border rounded-md">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2"><Bot /> Reporte de CodeFix</CardTitle>
-                      <p className="text-xs text-muted-foreground">{codefix.changed} de {codefix.scanned} archivos modificados.</p>
-                  </CardHeader>
-                  <CardContent>
-                      <div className="max-h-80 overflow-y-auto">
-                          <table className="w-full text-sm">
-                              <thead>
-                                  <tr className="border-b">
-                                      <th className="p-2 text-left font-medium text-muted-foreground">Archivo</th>
-                                      <th className="p-2 w-24 text-center font-medium text-muted-foreground">Modificado</th>
-                                      <th className="p-2 w-24 text-center font-medium text-muted-foreground">Vista Previa</th>
-                                  </tr>
-                              </thead>
-                              <tbody>
-                                  {codefix.files?.length > 0 ? codefix.files.map(file => (
-                                      <tr key={file.path} className="border-b">
-                                          <td className="p-2 font-mono text-xs">{file.path}</td>
-                                          <td className="text-center">
-                                              {file.changed ? 
-                                                  <CheckCircle className="h-5 w-5 text-green-500 inline-block"/> : 
-                                                  <span className="text-muted-foreground">-</span>}
-                                          </td>
-                                           <td className="text-center">
-                                              <Button 
-                                                variant="ghost" 
-                                                size="sm" 
-                                                disabled={!file.changed}
-                                                onClick={() => setSelectedFile(file)}
-                                              >
-                                                <Eye className="h-4 w-4" />
-                                              </Button>
-                                          </td>
-                                      </tr>
-                                  )) : (
-                                      <tr>
-                                          <td colSpan={3} className="text-center text-muted-foreground py-8">No se afectaron archivos.</td>
-                                      </tr>
-                                  )}
-                              </tbody>
-                          </table>
-                      </div>
-                  </CardContent>
+              <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-muted-foreground px-2">
+                    <span>{codefix.changed} de {codefix.scanned} archivos modificados.</span>
+                  </div>
+                  <div className="max-h-60 overflow-y-auto space-y-1">
+                      {codefix.files?.length > 0 ? codefix.files.map(file => (
+                          <div key={file.path} className="flex items-center justify-between p-2 bg-muted/30 rounded-md">
+                            <span className="font-mono text-xs">{file.path}</span>
+                             {file.changed ? 
+                                <Badge variant="outline" className="text-green-400 border-green-500/30">{file.changes} cambios</Badge> : 
+                                <span className="text-muted-foreground">-</span>}
+                          </div>
+                      )) : (
+                          <div className="text-center text-muted-foreground py-8">
+                            <p>No se afectaron archivos.</p>
+                          </div>
+                      )}
+                  </div>
               </div>
             ) : (
-                <div className="text-center text-muted-foreground py-16 border rounded-md">
-                    <Info className="mx-auto h-12 w-12" />
-                    <h3 className="mt-4 text-lg font-medium">No hay datos de CodeFix</h3>
-                    <p className="mt-1 text-sm">Ejecuta una vista previa o aplica los cambios para generar un reporte.</p>
+                <div className="text-center text-muted-foreground py-8">
+                    <Info className="mx-auto h-8 w-8" />
+                    <p className="mt-2 text-sm">No hay datos de CodeFix.</p>
                 </div>
             )}
         </TabsContent>
-        <TabsContent value="logs" className="p-6">
-            <div className="border rounded-md">
-                <CardHeader>
-                    <CardTitle className="text-sm font-medium flex items-center gap-2"><Terminal /> Logs</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <CodeBlock code={dbLog || log || "No hay logs disponibles para esta operación."} />
-                </CardContent>
-            </div>
+        <TabsContent value="logs" className="m-0">
+            <CodeBlock code={dbLog || log || "No hay logs disponibles."} />
         </TabsContent>
         </div>
       </Tabs>
@@ -220,5 +121,3 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
 
   return renderContent();
 }
-
-    

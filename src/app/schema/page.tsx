@@ -19,6 +19,7 @@ import {
   XCircle,
   Power,
   CheckCircle,
+  Settings,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -330,15 +331,7 @@ export default function SchemaPage() {
     };
 
 
-    if (!sessionId && loadingSchema) {
-        return (
-            <div className="flex h-screen w-full items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        )
-    }
-
-    if (!sessionId) {
+    if (!sessionId && !sessionLoading) {
         return (
             <div className="flex h-screen w-full items-center justify-center">
                 <div className="text-center">
@@ -372,25 +365,17 @@ export default function SchemaPage() {
                         <SidebarMenuItem>
                             <SidebarMenuButton isActive>
                                 <Database />
-                                Explorar Esquema
+                                Esquema
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton>
+                                <Settings />
+                                Ajustes
                             </SidebarMenuButton>
                         </SidebarMenuItem>
                     </SidebarMenu>
                 </SidebarContent>
-                <SidebarFooter>
-                     <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm p-2">
-                          <div className="flex items-center gap-2 text-green-400">
-                             <CheckCircle className="h-4 w-4" />
-                             <span>Conectado</span>
-                          </div>
-                        </div>
-                        <Button variant="outline" className="w-full" onClick={disconnect} disabled={sessionLoading}>
-                             {sessionLoading ? <Loader2 className="animate-spin" /> : <Power />}
-                             Desconectar
-                        </Button>
-                     </div>
-                </SidebarFooter>
             </Sidebar>
 
              <SidebarInset>
@@ -421,5 +406,3 @@ export default function SchemaPage() {
         </div>
     );
 }
-
-    
