@@ -10,20 +10,17 @@ export type RenameOperation = {
   note?: string | null;
 };
 
-export type CleanupRequest = {
-  connectionString: string;
+export type RefactorPlan = {
   renames: RenameOperation[];
-  useSynonyms?: boolean;
-  useViews?: boolean;
-  cqrs?: boolean;
-  allowDestructive?: boolean;
 };
 
-export type ApplyRequest = PlanRequest;
+// --- Tipos de conexión (solo uno es permitido) ---
+type WithSessionId = { sessionId: string; connectionKey?: never; connectionString?: never };
+type WithConnectionKey = { connectionKey: string; sessionId?: never; connectionString?: never };
+type WithConnectionString = { connectionString: string; sessionId?: never; connectionKey?: never };
 
-export interface RefactorPlan {
-  renames: RenameOperation[];
-}
+type ConnectionType = WithSessionId | WithConnectionKey | WithConnectionString;
+
 
 export type PlanRequest = {
   renames: RenameOperation[];
@@ -42,16 +39,22 @@ export interface PlanResponse {
   } | null;
 }
 
-export interface RefactorRequest {
-  connectionString: string;
+export type RefactorRequest = ConnectionType & {
   plan: RefactorPlan;
   apply: boolean;
   rootKey: string;
   useSynonyms: boolean;
   useViews: boolean;
   cqrs: boolean;
-}
+};
 
+export type CleanupRequest = ConnectionType & {
+  renames: RenameOperation[];
+  useSynonyms?: boolean;
+  useViews?: boolean;
+  cqrs?: boolean;
+  allowDestructive?: boolean;
+};
 
 
 export interface CodeFixRequest {
