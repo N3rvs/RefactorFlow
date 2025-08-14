@@ -323,7 +323,7 @@ function SchemaEditor({
                     Actualizar
                 </Button>
             </CardHeader>
-            <CardContent className="flex-1 flex flex-col p-4">
+            <CardContent className="flex-1 flex flex-col p-4 min-h-0">
                 <div className="relative mb-4">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input placeholder="Buscar tablas..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
@@ -339,7 +339,7 @@ function SchemaEditor({
                     </div>
                 )}
                 {!loading && schema && schema.tables.length > 0 && (
-                    <div className="flex-1 overflow-y-auto pr-2">
+                    <div className="flex-1 overflow-y-auto pr-2 max-h-[calc(100vh-28rem)]">
                         <Accordion type="multiple" className="w-full">
                             {enhancedTables.map((table) => (
                                 <AccordionItem value={table.name} key={table.name}>
@@ -468,6 +468,8 @@ export default function RefactorPage() {
   useEffect(() => {
     if (sessionId) {
         handleAnalyze();
+    } else {
+        setSchema(null);
     }
   }, [sessionId, handleAnalyze]);
 
@@ -496,7 +498,6 @@ export default function RefactorPage() {
     }
 
     setLoading(loadingState);
-    setResult(null);
     const { id } = toast({ title: toastMessages.loading, duration: 999999 });
 
     try {
@@ -601,12 +602,6 @@ export default function RefactorPage() {
                         </SidebarMenuButton>
                       </Link>
                   </SidebarMenuItem>
-                   <SidebarMenuItem>
-                      <SidebarMenuButton>
-                         <Settings />
-                         Ajustes
-                      </SidebarMenuButton>
-                  </SidebarMenuItem>
               </SidebarMenu>
           </SidebarContent>
       </Sidebar>
@@ -700,3 +695,5 @@ export default function RefactorPage() {
     </div>
   );
 }
+
+    

@@ -1,8 +1,8 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useDbSession } from "@/hooks/useDbSession";
+import React, { useState, useEffect, useContext } from "react";
+import { useDbSession, DbSessionContext } from "@/hooks/useDbSession";
 import { useToast } from "@/hooks/use-toast";
 import {
   Wand2,
@@ -20,10 +20,12 @@ import type { RefactorResponse } from "@/lib/types";
 
 
 export default function ResultsPage() {
-    const context = useDbSession();
+    const context = useContext(DbSessionContext);
     if (!context) throw new Error("SchemaPage must be used within a DbSessionProvider");
     
     const { sessionId } = context;
+    // This state would be populated from a parent component or a global store
+    // where the refactor results are kept. For now, it's null.
     const [result, setResult] = useState<RefactorResponse | null>(null);
 
 
@@ -45,9 +47,6 @@ export default function ResultsPage() {
                                  <Link href="/schema">
                                     <SidebarMenuButton isActive><Database />Resultados</SidebarMenuButton>
                                  </Link>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton><Settings />Ajustes</SidebarMenuButton>
                             </SidebarMenuItem>
                         </SidebarMenu>
                     </SidebarContent>
@@ -94,12 +93,6 @@ export default function ResultsPage() {
                                 </SidebarMenuButton>
                              </Link>
                         </SidebarMenuItem>
-                        <SidebarMenuItem>
-                            <SidebarMenuButton>
-                                <Settings />
-                                Ajustes
-                            </SidebarMenuButton>
-                        </SidebarMenuItem>
                     </SidebarMenu>
                 </SidebarContent>
             </Sidebar>
@@ -110,6 +103,7 @@ export default function ResultsPage() {
                         <h1 className="text-2xl font-bold">Resultados de Refactorización</h1>
                     </header>
                     <div className="flex-1 min-h-0">
+                       {/* The actual results would be passed into this panel */}
                        <ResultsPanel result={result} loading={false} error={result?.error || null} />
                     </div>
                 </main>
@@ -118,3 +112,4 @@ export default function ResultsPage() {
     );
 }
 
+    
