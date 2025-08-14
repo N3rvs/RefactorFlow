@@ -328,69 +328,72 @@ const sidebarMenuButtonVariants = cva(
   }
 )
 
-type SidebarMenuButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  asChild?: boolean;
-  isActive?: boolean;
-  tooltip?: string | React.ComponentProps<typeof TooltipContent>;
-} & VariantProps<typeof sidebarMenuButtonVariants>;
+type SidebarMenuButtonProps = React.HTMLAttributes<HTMLElement> & {
+  isActive?: boolean
+  tooltip?: string | React.ComponentProps<typeof TooltipContent>
+} & VariantProps<typeof sidebarMenuButtonVariants>
 
+const SidebarMenuButton = React.forwardRef<
+  HTMLButtonElement,
+  SidebarMenuButtonProps
+>(({ isActive, size, tooltip, className, ...props }, ref) => {
+  const { isMobile, state } = useSidebar()
 
-const SidebarMenuButton = React.forwardRef<HTMLButtonElement, SidebarMenuButtonProps>(
-  ({ asChild, isActive, size, tooltip, className, ...props }, ref) => {
-    const { isMobile, state } = useSidebar();
-    const Comp = asChild ? Slot : "button";
+  const button = (
+    <button
+      ref={ref}
+      data-sidebar="menu-button"
+      data-size={size}
+      data-active={isActive}
+      className={cn(
+        sidebarMenuButtonVariants({ size, className }),
+        "group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:px-2"
+      )}
+      {...props}
+    >
+      {React.Children.map(props.children, (child, i) => {
+        if (React.isValidElement(child) && typeof child.type !== "string") {
+          return React.cloneElement(child as React.ReactElement<any>, {
+            className: cn(child.props.className, "h-5 w-5 shrink-0"),
+          })
+        }
+        if (i === 1) {
+          // Text label
+          return (
+            <span className="truncate group-data-[state=collapsed]:hidden">
+              {child}
+            </span>
+          )
+        }
+        return child
+      })}
+    </button>
+  )
 
-    const button = (
-      <Comp
-        ref={ref}
-        data-sidebar="menu-button"
-        data-size={size}
-        data-active={isActive}
-        className={cn(
-          sidebarMenuButtonVariants({ size, className }),
-          "group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:px-2"
-        )}
-        {...props}
-      >
-        {React.Children.map(props.children, (child, i) => {
-          if (React.isValidElement(child) && typeof child.type !== 'string') {
-            return React.cloneElement(child as React.ReactElement<any>, {
-              className: cn(child.props.className, "shrink-0 h-5 w-5"),
-            });
-          }
-          if (i === 1) { // Text label
-            return <span className="truncate group-data-[state=collapsed]:hidden">{child}</span>;
-          }
-          return child;
-        })}
-      </Comp>
-    );
-
-    if (!tooltip) {
-      return button;
-    }
-
-    if (typeof tooltip === "string") {
-      tooltip = {
-        children: tooltip,
-      };
-    }
-
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>{button}</TooltipTrigger>
-        <TooltipContent
-          side="right"
-          align="center"
-          hidden={state !== "collapsed" || isMobile}
-          {...tooltip}
-        />
-      </Tooltip>
-    );
+  if (!tooltip) {
+    return button
   }
-);
 
+  if (typeof tooltip === "string") {
+    tooltip = {
+      children: tooltip,
+    }
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent
+        side="right"
+        align="center"
+        hidden={state !== "collapsed" || isMobile}
+        {...tooltip}
+      />
+    </Tooltip>
+  )
+})
 SidebarMenuButton.displayName = "SidebarMenuButton"
+
 
 export {
   Sidebar,
@@ -404,5 +407,3 @@ export {
   SidebarProvider,
   useSidebar,
 }
-
-    

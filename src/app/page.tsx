@@ -489,7 +489,7 @@ export default function RefactorPage() {
                       </SidebarMenuButton>
                   </SidebarMenuItem>
                    <SidebarMenuItem>
-                      <Link href="/schema" asChild>
+                      <Link href="/schema">
                         <SidebarMenuButton>
                            <Database />
                            Esquema
@@ -603,5 +603,3 @@ export default function RefactorPage() {
     </div>
   );
 }
-
-    

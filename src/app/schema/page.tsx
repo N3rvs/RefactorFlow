@@ -342,7 +342,7 @@ export default function SchemaPage() {
                     <SidebarContent>
                         <SidebarMenu>
                             <SidebarMenuItem>
-                                <Link href="/" asChild>
+                                <Link href="/">
                                     <SidebarMenuButton><Wand2 />Refactorizar</SidebarMenuButton>
                                 </Link>
                             </SidebarMenuItem>
@@ -382,7 +382,7 @@ export default function SchemaPage() {
                 <SidebarContent>
                      <SidebarMenu>
                         <SidebarMenuItem>
-                            <Link href="/" asChild>
+                            <Link href="/">
                                 <SidebarMenuButton>
                                     <Wand2 />
                                     Refactorizar
@@ -433,5 +433,3 @@ export default function SchemaPage() {
         </div>
     );
 }
-
-    
