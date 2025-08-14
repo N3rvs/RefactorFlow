@@ -276,12 +276,11 @@ export default function SchemaPage() {
 
     const [plan, setPlan] = useState<RefactorPlan>(initialPlan);
     const [schema, setSchema] = useState<SchemaResponse | null>(null);
-    const [loadingSchema, setLoadingSchema] = useState(false);
+    const [loadingSchema, setLoadingSchema] = useState(true);
     const { toast } = useToast();
 
     const handleAnalyze = React.useCallback(async () => {
         if (!sessionId) {
-          toast({ variant: "destructive", title: "La sesión no está activa." });
           return;
         }
         setLoadingSchema(true);
@@ -302,10 +301,10 @@ export default function SchemaPage() {
     }, [sessionId, toast]);
 
     useEffect(() => {
-        if (sessionId && !schema) {
+        if (sessionId) {
             handleAnalyze();
         }
-    }, [sessionId, schema, handleAnalyze]);
+    }, [sessionId, handleAnalyze]);
 
     const removeRename = (index: number) => {
         setPlan(prev => ({ ...prev, renames: prev.renames.filter((_, i) => i !== index) }));
@@ -330,6 +329,14 @@ export default function SchemaPage() {
         }
     };
 
+
+    if (!sessionId && loadingSchema) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        )
+    }
 
     if (!sessionId) {
         return (

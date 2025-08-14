@@ -130,3 +130,5 @@ export interface Table {
 export interface SchemaResponse {
     tables: Table[];
 }
+
+    

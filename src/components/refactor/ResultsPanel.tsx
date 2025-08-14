@@ -220,3 +220,5 @@ export default function ResultsPanel({ result, loading, error }: ResultsPanelPro
 
   return renderContent();
 }
+
+    

@@ -16,8 +16,6 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-
 import {
   Wand2,
   Loader2,
@@ -30,9 +28,7 @@ import {
   FileCode,
   Play,
   DatabaseZap,
-  ChevronDown,
   Circle,
-  Plus,
   Link2
 } from "lucide-react";
 import { Logo } from "@/components/logo";
@@ -48,7 +44,7 @@ function ConnectionManager() {
     const context = useContext(DbSessionContext);
     if (!context) throw new Error("ConnectionManager must be used within a DbSessionProvider");
     
-    const { sessionId, connect, disconnect, loading, error } = context;
+    const { sessionId, connect, loading, error } = context;
     const [cs, setCs] = useState("");
     const [isConnecting, setIsConnecting] = useState(false);
     const { toast } = useToast();
@@ -59,18 +55,13 @@ function ConnectionManager() {
         setName(`cs_${Math.random().toString(36).slice(2)}`);
     }, []);
 
-    useEffect(() => {
-        if (sessionId) {
-            setCs("");
-        }
-    }, [sessionId]);
-
     const onConnect = async () => {
         if (!cs.trim()) return;
         setIsConnecting(true);
         try {
             await connect(cs.trim(), 3600);
             toast({ title: "Conexión exitosa", description: "La sesión está activa. Ya puedes explorar el esquema." });
+            setCs(""); // Limpiar input
         } catch (err: any) {
             toast({ variant: "destructive", title: "Error de conexión", description: err.message });
         } finally {
@@ -128,7 +119,6 @@ function ConnectionManager() {
     );
 }
 
-
 export default function RefactorPage() {
   const context = useContext(DbSessionContext);
   if (!context) throw new Error("RefactorPage must be used within a DbSessionProvider");
@@ -141,7 +131,6 @@ export default function RefactorPage() {
   
   const [loading, setLoading] = useState<"preview" | "apply" | "cleanup" | "analyze" | "plan" | "codefix" | false>(false);
   const [result, setResult] = useState<RefactorResponse | null>(null);
-  const [schema, setSchema] = useState<SchemaResponse | null>(null);
   
   const [isCleanupAlertOpen, setCleanupAlertOpen] = useState(false);
   const [cleanupConfirmation, setCleanupConfirmation] = useState("");
@@ -169,7 +158,9 @@ export default function RefactorPage() {
     }
 
     setLoading(loadingState);
-    setResult(null); // Clear previous results
+    if(loadingState !== 'plan' && loadingState !== 'codefix') {
+      setResult(null); // Clear previous results only for DB operations
+    }
     const { id } = toast({ title: toastMessages.loading, duration: 999999 });
 
     try {
@@ -186,22 +177,6 @@ export default function RefactorPage() {
       setLoading(false);
     }
   };
-
-  const handleAnalyze = React.useCallback(() => {
-      if (!sessionId) return;
-      handleApiCall(
-        () => analyzeSchema(sessionId),
-        "analyze",
-        (data) => setSchema(data),
-        { loading: "Analizando esquema...", success: "Análisis de esquema completado.", error: "Falló el análisis de esquema." }
-    );
-  }, [sessionId, toast]);
-
-  useEffect(() => {
-    if (sessionId && !schema) {
-      handleAnalyze();
-    }
-  }, [sessionId, schema, handleAnalyze]);
 
   const handlePlan = () => handleApiCall(
     () => generatePlan({ renames: plan.renames, ...options }),

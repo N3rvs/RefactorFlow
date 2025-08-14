@@ -1,3 +1,4 @@
+
 import { DatabaseZap } from 'lucide-react';
 
 export function Logo() {
@@ -10,3 +11,5 @@ export function Logo() {
     </div>
   );
 }
+
+    

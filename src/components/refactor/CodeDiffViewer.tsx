@@ -38,3 +38,5 @@ export function CodeDiffViewer({ file, onClose }: CodeDiffViewerProps) {
         </Dialog>
     );
 }
+
+    
