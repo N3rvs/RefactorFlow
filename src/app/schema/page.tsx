@@ -361,7 +361,7 @@ export default function SchemaPage() {
                 <SidebarContent>
                      <SidebarMenu>
                         <SidebarMenuItem>
-                            <Link href="/" passHref asChild>
+                            <Link href="/" asChild>
                                 <SidebarMenuButton>
                                     <Wand2 />
                                     Refactorizar

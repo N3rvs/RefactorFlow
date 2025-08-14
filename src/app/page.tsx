@@ -324,7 +324,7 @@ export default function RefactorPage() {
                       </SidebarMenuButton>
                   </SidebarMenuItem>
                    <SidebarMenuItem>
-                      <Link href="/schema" passHref asChild>
+                      <Link href="/schema" asChild>
                         <SidebarMenuButton>
                            <Database />
                            Explorar Esquema
@@ -418,3 +418,5 @@ export default function RefactorPage() {
     </div>
   );
 }
+
+    
