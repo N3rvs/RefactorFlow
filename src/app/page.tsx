@@ -225,54 +225,74 @@ function PlanManager({ plan, setPlan }: { plan: RefactorPlan, setPlan: React.Dis
     );
 }
 
-function SchemaSummary({ onAnalyze, loading }: { onAnalyze: () => void, loading: boolean }) {
-    // Dummy data for display based on the image
-    const summaryData = [
-        { name: 'orders', cols: 5, fx: 1, idx: 1 },
-        { name: 'products', cols: 3, fx: 2, idx: 2 },
-        { name: 'users', cols: 4, fx: 2, idx: 2 },
-    ];
-
-    return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle className="text-base font-medium">Esquema</CardTitle>
-                    <CardDescription className="text-xs">Resumen de la base de datos.</CardDescription>
-                </div>
-                <Button variant="outline" size="sm" onClick={onAnalyze} disabled={loading}>
-                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Database className="mr-2 h-4 w-4"/>} Analizar
-                </Button>
-            </CardHeader>
-            <CardContent>
-                <UiTable>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Tabla</TableHead>
-                            <TableHead className="text-right"># Cols</TableHead>
-                            <TableHead className="text-right"># FX</TableHead>
-                            <TableHead className="text-right"># IDX</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {summaryData.map(table => (
-                            <TableRow key={table.name}>
-                                <TableCell className="font-mono text-xs">{table.name}</TableCell>
-                                <TableCell className="text-right">{table.cols}</TableCell>
-                                <TableCell className="text-right">{table.fx}</TableCell>
-                                <TableCell className="text-right">{table.idx}</TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </UiTable>
-                 <Button variant="link" size="sm" asChild className="w-full mt-2 text-muted-foreground">
-                    <Link href="/schema" className="flex items-center">
-                        <Eye className="mr-2 h-4 w-4"/> Ver esquema completo
-                    </Link>
-                </Button>
-            </CardContent>
-        </Card>
-    );
+function SchemaSummary({
+  schema,
+  onAnalyze,
+  loading,
+}: {
+  schema: SchemaResponse | null;
+  onAnalyze: () => void;
+  loading: boolean;
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle className="text-base font-medium">Esquema</CardTitle>
+          <CardDescription className="text-xs">
+            Resumen de la base de datos.
+          </CardDescription>
+        </div>
+        <Button variant="outline" size="sm" onClick={onAnalyze} disabled={loading}>
+          {loading ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Database className="mr-2 h-4 w-4" />
+          )}
+          Analizar
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {!schema ? (
+          <div className="text-center py-10 text-sm text-muted-foreground">
+            <p>Ejecuta el analizador para ver el esquema de la base de datos.</p>
+          </div>
+        ) : schema.tables.length === 0 ? (
+          <div className="text-center py-10 text-sm text-muted-foreground">
+            <p>No se encontraron tablas en la base de datos.</p>
+          </div>
+        ) : (
+          <>
+            <UiTable>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tabla</TableHead>
+                  <TableHead className="text-right"># Cols</TableHead>
+                  <TableHead className="text-right"># FX</TableHead>
+                  <TableHead className="text-right"># IDX</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {schema.tables.map((table) => (
+                  <TableRow key={table.name}>
+                    <TableCell className="font-mono text-xs">{table.name}</TableCell>
+                    <TableCell className="text-right">{table.columns.length}</TableCell>
+                    <TableCell className="text-right">{table.foreignKeys.length}</TableCell>
+                    <TableCell className="text-right">{table.indexes.length}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </UiTable>
+            <Button variant="link" size="sm" asChild className="w-full mt-2 text-muted-foreground">
+              <Link href="/schema" className="flex items-center">
+                <Eye className="mr-2 h-4 w-4" /> Ver esquema completo
+              </Link>
+            </Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function RefactorPage() {
@@ -480,7 +500,11 @@ export default function RefactorPage() {
                            <ResultsPanel result={result} loading={!!loading} error={result?.error || null} />
                         </div>
                         <div className="flex flex-col">
-                          <SchemaSummary onAnalyze={handleAnalyze} loading={loading === 'analyze'}/>
+                          <SchemaSummary
+                            schema={schema}
+                            onAnalyze={handleAnalyze}
+                            loading={loading === 'analyze'}
+                          />
                         </div>
                     </div>
                 </div>
@@ -511,5 +535,7 @@ export default function RefactorPage() {
     </div>
   );
 }
+
+    
 
     
