@@ -272,7 +272,7 @@ export default function SchemaPage() {
     const context = useDbSession();
     if (!context) throw new Error("SchemaPage must be used within a DbSessionProvider");
     
-    const { sessionId, disconnect, loading: sessionLoading } = context;
+    const { sessionId } = context;
 
     const [plan, setPlan] = useState<RefactorPlan>(initialPlan);
     const [schema, setSchema] = useState<SchemaResponse | null>(null);
@@ -305,6 +305,7 @@ export default function SchemaPage() {
             handleAnalyze();
         } else {
             setLoadingSchema(false);
+            setSchema(null);
         }
     }, [sessionId, handleAnalyze]);
 
@@ -322,17 +323,19 @@ export default function SchemaPage() {
             return;
         }
         
+        const { id } = toast({ title: "Aplicando plan...", duration: 999999 });
         try {
             await runRefactor({ sessionId, plan, apply: true, rootKey: 'SOLUTION', useSynonyms: true, useViews: true, cqrs: true });
-            toast({ title: "Plan aplicado con éxito" });
+            toast.update(id, { title: "Plan aplicado con éxito" });
             handleAnalyze(); // Re-fetch schema
+            setPlan(initialPlan); // Reset plan
         } catch(err: any) {
-            toast({ variant: "destructive", title: "Error al aplicar el plan", description: err.message });
+            toast.update(id, { variant: "destructive", title: "Error al aplicar el plan", description: err.message });
         }
     };
 
 
-    if (!sessionId && !sessionLoading) {
+    if (!sessionId && !loadingSchema) {
         return (
             <div className="flex min-h-screen bg-background text-foreground font-sans">
                  <Sidebar>
@@ -347,7 +350,9 @@ export default function SchemaPage() {
                                 </Link>
                             </SidebarMenuItem>
                             <SidebarMenuItem>
-                                <SidebarMenuButton isActive><Database />Esquema</SidebarMenuButton>
+                                 <Link href="/schema">
+                                    <SidebarMenuButton isActive><Database />Esquema</SidebarMenuButton>
+                                 </Link>
                             </SidebarMenuItem>
                             <SidebarMenuItem>
                                 <SidebarMenuButton><Settings />Ajustes</SidebarMenuButton>
@@ -390,10 +395,12 @@ export default function SchemaPage() {
                             </Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                            <SidebarMenuButton isActive>
-                                <Database />
-                                Esquema
-                            </SidebarMenuButton>
+                            <Link href="/schema">
+                                <SidebarMenuButton isActive>
+                                    <Database />
+                                    Esquema
+                                </SidebarMenuButton>
+                            </Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                             <SidebarMenuButton>

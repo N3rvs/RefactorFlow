@@ -254,76 +254,6 @@ function PlanManager({ plan, setPlan }: { plan: RefactorPlan, setPlan: React.Dis
     );
 }
 
-function SchemaSummary({
-  schema,
-  onAnalyze,
-  loading,
-}: {
-  schema: SchemaResponse | null;
-  onAnalyze: () => void;
-  loading: boolean;
-}) {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle className="text-base font-medium">Esquema</CardTitle>
-          <CardDescription className="text-xs">
-            Resumen de la base de datos.
-          </CardDescription>
-        </div>
-        <Button variant="outline" size="sm" onClick={onAnalyze} disabled={loading}>
-          {loading ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Database className="mr-2 h-4 w-4" />
-          )}
-          Analizar
-        </Button>
-      </CardHeader>
-      <CardContent>
-        {!schema ? (
-          <div className="text-center py-10 text-sm text-muted-foreground">
-            <p>Ejecuta el analizador para ver el esquema de la base de datos.</p>
-          </div>
-        ) : schema.tables.length === 0 ? (
-          <div className="text-center py-10 text-sm text-muted-foreground">
-            <p>No se encontraron tablas en la base de datos.</p>
-          </div>
-        ) : (
-          <>
-            <UiTable>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tabla</TableHead>
-                  <TableHead className="text-right"># Cols</TableHead>
-                  <TableHead className="text-right"># FX</TableHead>
-                  <TableHead className="text-right"># IDX</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {schema.tables.map((table) => (
-                  <TableRow key={table.name}>
-                    <TableCell className="font-mono text-xs">{table.name}</TableCell>
-                    <TableCell className="text-right">{table.columns.length}</TableCell>
-                    <TableCell className="text-right">{table.foreignKeys.length}</TableCell>
-                    <TableCell className="text-right">{table.indexes.length}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </UiTable>
-            <Button variant="link" size="sm" asChild className="w-full mt-2 text-muted-foreground">
-              <Link href="/schema" className="flex items-center">
-                <Eye className="mr-2 h-4 w-4" /> Ver esquema completo
-              </Link>
-            </Button>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function RefactorPage() {
   const context = useContext(DbSessionContext);
   if (!context) throw new Error("RefactorPage must be used within a DbSessionProvider");
@@ -334,11 +264,9 @@ export default function RefactorPage() {
   const [options, setOptions] = useState({ useSynonyms: true, useViews: true, cqrs: true, allowDestructive: false });
   const [rootKey, setRootKey] = useState("SOLUTION");
   
-  const [loading, setLoading] = useState<"preview" | "apply" | "cleanup" | "analyze" | "plan" | "codefix" | false>(false);
+  const [loading, setLoading] = useState<"preview" | "apply" | "cleanup" | "plan" | "codefix" | false>(false);
   const [result, setResult] = useState<RefactorResponse | null>(null);
-  const [schema, setSchema] = useState<SchemaResponse | null>(null);
   
-  const [isCleanupAlertOpen, setCleanupAlertOpen] = useState(false);
   const [isApplyAlertOpen, setApplyAlertOpen] = useState(false);
   const [actionModal, setActionModal] = useState<ActionModalType>(null);
   
@@ -351,7 +279,7 @@ export default function RefactorPage() {
   
   const handleApiCall = async <T,>(
     apiFn: () => Promise<T>,
-    loadingState: "preview" | "apply" | "cleanup" | "analyze" | "plan" | "codefix",
+    loadingState: "preview" | "apply" | "cleanup" | "plan" | "codefix",
     onSuccess: (data: T) => void,
     toastMessages: { loading: string; success: string; error: string }
   ) => {
@@ -359,7 +287,7 @@ export default function RefactorPage() {
       toast({ variant: "destructive", title: "La sesión no está activa.", description: "Por favor, conéctate a una base de datos primero." });
       return;
     }
-     if (plan.renames.length === 0 && !['analyze', 'cleanup'].includes(loadingState)) {
+     if (plan.renames.length === 0 && !['cleanup'].includes(loadingState)) {
       toast({ variant: "destructive", title: "El plan de refactorización no puede estar vacío." });
       return;
     }
@@ -394,13 +322,6 @@ export default function RefactorPage() {
     { loading: "Generando plan...", success: "Plan generado.", error: "Fallo al generar el plan." }
   );
   
-  const handleAnalyze = () => handleApiCall(
-    () => analyzeSchema(sessionId!),
-    "analyze",
-    (data) => setSchema(data),
-    { loading: "Analizando esquema...", success: "Esquema analizado.", error: "Fallo al analizar el esquema." }
-  );
-
   const handleRefactorPreview = () => {
     handleApiCall(
     () => runRefactor({ sessionId: sessionId!, plan, apply: false, rootKey, ...options }),
@@ -426,23 +347,6 @@ export default function RefactorPage() {
         }
     );
     setApplyAlertOpen(false);
-  }
-
-  const triggerCleanup = () => {
-    setCleanupAlertOpen(true);
-  };
-  
-  const handleCleanup = () => {
-    if (!sessionId) return;
-    handleApiCall(
-        () => runCleanup({ sessionId, renames: plan.renames, ...options }),
-        "cleanup",
-        (data) => {
-            setResult(data);
-            setCleanupAlertOpen(false);
-        },
-        { loading: "Ejecutando limpieza...", success: "Limpieza completada.", error: "Falló la limpieza." }
-    );
   }
   
   const handleCodefix = () => handleApiCall(
@@ -483,10 +387,12 @@ export default function RefactorPage() {
           <SidebarContent>
               <SidebarMenu>
                   <SidebarMenuItem>
-                      <SidebarMenuButton isActive>
-                          <Wand2 />
-                          Refactorizar
-                      </SidebarMenuButton>
+                      <Link href="/">
+                        <SidebarMenuButton isActive>
+                            <Wand2 />
+                            Refactorizar
+                        </SidebarMenuButton>
+                      </Link>
                   </SidebarMenuItem>
                    <SidebarMenuItem>
                       <Link href="/schema">
@@ -538,17 +444,8 @@ export default function RefactorPage() {
                         </Button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6 flex-1 min-h-0">
-                        <div className="flex flex-col">
-                           <ResultsPanel result={result} loading={!!loading} error={result?.error || null} />
-                        </div>
-                        <div className="flex flex-col">
-                          <SchemaSummary
-                            schema={schema}
-                            onAnalyze={handleAnalyze}
-                            loading={loading === 'analyze'}
-                          />
-                        </div>
+                    <div className="flex-1 min-h-0">
+                       <ResultsPanel result={result} loading={!!loading} error={result?.error || null} />
                     </div>
                 </div>
              </div>
