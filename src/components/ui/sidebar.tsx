@@ -350,6 +350,11 @@ const SidebarMenuButton = React.forwardRef<
   ) => {
     const Comp = asChild ? Slot : "button"
     const { isMobile, state } = useSidebar()
+    
+    const buttonProps = {
+      ...props,
+      ...(!asChild && {ref: ref}),
+    };
 
     const buttonContent = (
       <>
@@ -369,12 +374,12 @@ const SidebarMenuButton = React.forwardRef<
 
     const button = (
       <Comp
-        ref={ref}
         data-sidebar="menu-button"
         data-size={size}
         data-active={isActive}
         className={cn(sidebarMenuButtonVariants({ size, className }), "group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:px-2")}
-        {...props}
+        {...buttonProps}
+        {...(asChild && {ref: ref})}
       >
         {buttonContent}
       </Comp>
@@ -417,5 +422,3 @@ export {
   SidebarProvider,
   useSidebar,
 }
-
-    
